@@ -4,3 +4,4 @@
 .cursorignore
 src/credentials.h
 platformio.ini
+.env

@@ -28,8 +28,8 @@ extern lv_obj_t *network_label;
 extern lv_obj_t *cores_label;
 extern lv_obj_t *total_ram_label;
 extern lv_obj_t *temp_label;
-extern lv_obj_t *load_label;
-extern lv_obj_t *cache_label;
+extern lv_obj_t *gpu_label;
+extern lv_obj_t *vram_label;
 
 extern ArcWithLabel cpu_arc_obj;
 extern ArcWithLabel ram_arc_obj;

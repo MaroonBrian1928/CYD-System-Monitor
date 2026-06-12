@@ -1,7 +1,9 @@
 #include "display.h"
 #include <Arduino.h>
 
-#define TFT_BL 27
+// Standard CYD (ESP32-2432S028) backlight is on GPIO21. (Upstream hardcoded 27;
+// if the screen stays dark after flashing, try changing this back to 27.)
+#define TFT_BL 21
 #define TFT_BACKLIGHT_ON HIGH
 
 TFT_eSPI tft = TFT_eSPI();

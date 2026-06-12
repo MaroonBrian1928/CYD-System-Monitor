@@ -18,7 +18,7 @@ void SettingsManager::begin()
     preferences.begin("settings", false);
     darkMode = preferences.getBool("darkMode", true);
 
-    glancesHost = preferences.getString("glances_host", "");
+    glancesHost = preferences.getString("glances_host", "192.168.1.50");
     glancesPort = preferences.getUInt("glances_port", 61208);
 
     glances_host = glancesHost;

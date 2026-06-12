@@ -98,7 +98,7 @@ void updateGlancesData()
     {
         for (JsonVariant sensor : doc.as<JsonArray>())
         {
-            if (strcmp(sensor["label"], "Package id 0") == 0)
+            if (strcmp(sensor["label"], "Tctl") == 0)
             {
                 int temp = (int)sensor["value"].as<float>();
                 char buf[32];
@@ -109,43 +109,36 @@ void updateGlancesData()
         }
     }
 
+    // Disk: this host's root filesystem is exposed by Glances at "/host"
+    // (was the Unraid "/rootfs/mnt/disk*" array on the upstream firmware).
     if (GlancesAPI::fetchData("/api/4/fs", doc))
     {
-        unsigned long long totalSize = 0;
-        unsigned long long usedSize = 0;
-
         for (JsonVariant fs : doc.as<JsonArray>())
         {
             const char *mnt_point = fs["mnt_point"].as<const char *>();
-            if (strncmp(mnt_point, "/rootfs/mnt/disk", 15) == 0)
+            if (strcmp(mnt_point, "/host") == 0)
             {
-                totalSize += fs["size"].as<unsigned long long>();
-                usedSize += fs["used"].as<unsigned long long>();
+                float usagePercent = fs["percent"].as<float>();
+                char buf[32];
+                snprintf(buf, sizeof(buf), LV_SYMBOL_DRIVE " Disk: %.1f%%", usagePercent);
+                update_compact_label(disk_label, buf);
+                break;
             }
-        }
-
-        if (totalSize > 0)
-        {
-            float usagePercent = (usedSize * 100.0) / totalSize;
-            char buf[32];
-            snprintf(buf, sizeof(buf), LV_SYMBOL_DRIVE " Array: %.1f%%", usagePercent);
-            update_compact_label(disk_label, buf);
         }
     }
 
-    if (GlancesAPI::fetchData("/api/4/fs", doc))
+    // GPU (NVIDIA, via Glances /gpu plugin): "proc" = GPU utilization %, "mem" = VRAM %.
+    if (GlancesAPI::fetchData("/api/4/gpu", doc))
     {
-        for (JsonVariant fs : doc.as<JsonArray>())
+        JsonArray gpus = doc.as<JsonArray>();
+        if (gpus.size() > 0)
         {
-            const char *mnt_point = fs["mnt_point"].as<const char *>();
-            if (strcmp(mnt_point, "/rootfs/mnt/cache") == 0)
-            {
-                float usage = fs["percent"].as<float>();
-                char buf[32];
-                snprintf(buf, sizeof(buf), LV_SYMBOL_SAVE " Cache: %.1f%%", usage);
-                update_compact_label(cache_label, buf);
-                break;
-            }
+            JsonObject gpu = gpus[0];
+            char buf[32];
+            snprintf(buf, sizeof(buf), LV_SYMBOL_CHARGE " GPU: %d%%", (int)gpu["proc"].as<float>());
+            update_compact_label(gpu_label, buf);
+            snprintf(buf, sizeof(buf), LV_SYMBOL_SAVE " VRAM: %d%%", (int)gpu["mem"].as<float>());
+            update_compact_label(vram_label, buf);
         }
     }
 
@@ -164,7 +157,7 @@ void updateGlancesData()
         {
             const char *interface_name = interface["interface_name"].as<const char *>();
 
-            if (strcmp(interface_name, "eth0") == 0)
+            if (strcmp(interface_name, "enp4s0") == 0)
             {
                 float recv_rate = interface["bytes_recv_rate_per_sec"].as<float>();
                 float sent_rate = interface["bytes_sent_rate_per_sec"].as<float>();
@@ -189,14 +182,6 @@ void updateGlancesData()
                 break;
             }
         }
-    }
-
-    if (GlancesAPI::fetchData("/api/4/load", doc))
-    {
-        float load1 = doc["min1"].as<float>();
-        char buf[32];
-        snprintf(buf, sizeof(buf), LV_SYMBOL_CHARGE " Load: %.1f", load1);
-        update_compact_label(load_label, buf);
     }
 
     lastGlancesUpdate = millis();

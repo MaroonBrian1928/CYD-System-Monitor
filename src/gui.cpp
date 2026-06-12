@@ -11,8 +11,8 @@ lv_obj_t *network_label = NULL;
 lv_obj_t *cores_label = NULL;
 lv_obj_t *total_ram_label = NULL;
 lv_obj_t *temp_label = NULL;
-lv_obj_t *load_label = NULL;
-lv_obj_t *cache_label = NULL;
+lv_obj_t *gpu_label = NULL;
+lv_obj_t *vram_label = NULL;
 ArcWithLabel cpu_arc_obj = {NULL, NULL};
 ArcWithLabel ram_arc_obj = {NULL, NULL};
 
@@ -280,10 +280,10 @@ void applyTheme(bool darkMode)
 
     lv_obj_t *compact_labels[] = {
         temp_label,
-        load_label,
+        gpu_label,
         uptime_label,
         disk_label,
-        cache_label,
+        vram_label,
         network_label};
 
     for (lv_obj_t *label : compact_labels)
@@ -360,8 +360,8 @@ void create_system_monitor_gui()
     if (!temp_label)
         return;
 
-    load_label = create_compact_label(left_col, LV_SYMBOL_CHARGE " Load: -.-", theme);
-    if (!load_label)
+    gpu_label = create_compact_label(left_col, LV_SYMBOL_CHARGE " GPU: --%", theme);
+    if (!gpu_label)
         return;
 
     uptime_label = create_compact_label(left_col, LV_SYMBOL_POWER "  ---", theme);
@@ -372,8 +372,8 @@ void create_system_monitor_gui()
     if (!disk_label)
         return;
 
-    cache_label = create_compact_label(right_col, LV_SYMBOL_SAVE " Cache: ---%", theme);
-    if (!cache_label)
+    vram_label = create_compact_label(right_col, LV_SYMBOL_SAVE " VRAM: ---%", theme);
+    if (!vram_label)
         return;
 
     network_label = create_compact_label(right_col, LV_SYMBOL_DOWNLOAD " --- " LV_SYMBOL_UPLOAD " ---", theme);
