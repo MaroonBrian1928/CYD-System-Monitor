@@ -13,6 +13,14 @@ static ThemeColors mutable_light_theme = light_theme;
 String SettingsManager::glancesHost;
 uint16_t SettingsManager::glancesPort;
 
+TouchCalibration SettingsManager::touchCal = {
+    TOUCH_CAL_DEFAULT_X_MIN, TOUCH_CAL_DEFAULT_X_MAX,
+    TOUCH_CAL_DEFAULT_Y_MIN, TOUCH_CAL_DEFAULT_Y_MAX,
+    TOUCH_CAL_DEFAULT_SWAP_XY, TOUCH_CAL_DEFAULT_INVERT_X, TOUCH_CAL_DEFAULT_INVERT_Y};
+
+bool SettingsManager::autoRotate = false;
+uint16_t SettingsManager::autoRotateInterval = 10;
+
 void SettingsManager::begin()
 {
     preferences.begin("settings", false);
@@ -23,6 +31,17 @@ void SettingsManager::begin()
 
     glances_host = glancesHost;
     glances_port = glancesPort;
+
+    touchCal.rawXMin = preferences.getUShort("tch_xmin", TOUCH_CAL_DEFAULT_X_MIN);
+    touchCal.rawXMax = preferences.getUShort("tch_xmax", TOUCH_CAL_DEFAULT_X_MAX);
+    touchCal.rawYMin = preferences.getUShort("tch_ymin", TOUCH_CAL_DEFAULT_Y_MIN);
+    touchCal.rawYMax = preferences.getUShort("tch_ymax", TOUCH_CAL_DEFAULT_Y_MAX);
+    touchCal.swapXY = preferences.getBool("tch_swap", TOUCH_CAL_DEFAULT_SWAP_XY);
+    touchCal.invertX = preferences.getBool("tch_invx", TOUCH_CAL_DEFAULT_INVERT_X);
+    touchCal.invertY = preferences.getBool("tch_invy", TOUCH_CAL_DEFAULT_INVERT_Y);
+
+    autoRotate = preferences.getBool("auto_rotate", false);
+    autoRotateInterval = preferences.getUShort("rotate_secs", 10);
 
     mutable_dark_theme = dark_theme;
     mutable_light_theme = light_theme;
@@ -161,4 +180,54 @@ void SettingsManager::setGlancesPort(uint16_t port)
     glancesPort = port;
     preferences.putUInt("glances_port", port);
     glances_port = port;
+}
+
+const TouchCalibration &SettingsManager::getTouchCalibration()
+{
+    return touchCal;
+}
+
+void SettingsManager::setTouchCalibration(const TouchCalibration &cal)
+{
+    touchCal = cal;
+    preferences.putUShort("tch_xmin", cal.rawXMin);
+    preferences.putUShort("tch_xmax", cal.rawXMax);
+    preferences.putUShort("tch_ymin", cal.rawYMin);
+    preferences.putUShort("tch_ymax", cal.rawYMax);
+    preferences.putBool("tch_swap", cal.swapXY);
+    preferences.putBool("tch_invx", cal.invertX);
+    preferences.putBool("tch_invy", cal.invertY);
+}
+
+void SettingsManager::resetTouchCalibration()
+{
+    TouchCalibration def = {
+        TOUCH_CAL_DEFAULT_X_MIN, TOUCH_CAL_DEFAULT_X_MAX,
+        TOUCH_CAL_DEFAULT_Y_MIN, TOUCH_CAL_DEFAULT_Y_MAX,
+        TOUCH_CAL_DEFAULT_SWAP_XY, TOUCH_CAL_DEFAULT_INVERT_X, TOUCH_CAL_DEFAULT_INVERT_Y};
+    setTouchCalibration(def);
+}
+
+bool SettingsManager::getAutoRotate()
+{
+    return autoRotate;
+}
+
+uint16_t SettingsManager::getAutoRotateInterval()
+{
+    return autoRotateInterval;
+}
+
+void SettingsManager::setAutoRotate(bool enabled)
+{
+    autoRotate = enabled;
+    preferences.putBool("auto_rotate", enabled);
+}
+
+void SettingsManager::setAutoRotateInterval(uint16_t seconds)
+{
+    if (seconds < 1)
+        seconds = 1;
+    autoRotateInterval = seconds;
+    preferences.putUShort("rotate_secs", seconds);
 }

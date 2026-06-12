@@ -15,27 +15,22 @@
 #define XPT2046_IRQ 36
 
 // --- Calibration -----------------------------------------------------------
-// Raw XPT2046 readings run ~0..4095. These map the raw range onto the 320x240
-// landscape (rotation 3) screen. Resistive panels vary unit-to-unit, so expect
-// to tune these once: enable TOUCH_DEBUG below, tap the four corners, read the
-// raw min/max off the serial monitor, and drop them in here.
-#define TOUCH_RAW_X_MIN 200
-#define TOUCH_RAW_X_MAX 3700
-#define TOUCH_RAW_Y_MIN 240
-#define TOUCH_RAW_Y_MAX 3800
+// Calibration lives in NVS (see SettingsManager / TouchCalibration) so it can be
+// tuned from the web UI without reflashing. The factory defaults are in
+// settings_manager.h (TOUCH_CAL_DEFAULT_*).
 
-// Orientation adjustments for rotation 3. If taps land on the wrong axis or are
-// mirrored, flip these (0/1) rather than rewriting the mapping math.
-#define TOUCH_SWAP_XY 1
-#define TOUCH_INVERT_X 0
-#define TOUCH_INVERT_Y 1
-
-// Set to 1 to print raw + mapped coordinates to Serial on every touch (for
-// calibration). Leave at 0 for normal use.
+// Set to 1 to also print raw + mapped coordinates to Serial on every touch.
+// Leave at 0 for normal use (the web UI shows the live raw values instead).
 #define TOUCH_DEBUG 0
+
+#include <cstdint>
 
 // Initialise the touch controller and register it as an LVGL pointer input
 // device. Call once, after lv_init()/display init and after the GUI is built.
 void touch_init();
+
+// Most recent raw (uncalibrated) XPT2046 reading, for live calibration in the
+// web UI. Holds the last touched sample (0..4095).
+void touch_get_last_raw(int16_t &x, int16_t &y);
 
 #endif

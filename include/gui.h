@@ -39,6 +39,13 @@ extern ArcWithLabel ram_arc_obj;
 extern lv_obj_t *container_label;
 bool gui_container_page_active();
 
+// Called by the touch driver on each tap to advance to the next page (wraps).
+void gui_next_page();
+
+// Auto-cycle between the UI pages (NOT screen orientation). interval_sec is how
+// long each page is shown before advancing.
+void gui_set_auto_rotate(bool enabled, uint32_t interval_sec);
+
 // Shared monospace (UNSCII_8) column layout so the header and the data rows
 // line up. Row uses LVGL recolor (#RRGGBB ...#) to tint the status column.
 //          name(15)        status(7)  cpu(5) mem(6)

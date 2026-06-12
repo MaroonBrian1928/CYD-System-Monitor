@@ -104,6 +104,8 @@ fetch('/settings')
     document.getElementById('glancesHost').value = data.glances_host
     document.getElementById('glancesPort').value = data.glances_port
     updateServerDisplay()
+    populateTouchCalibration(data)
+    populateAutoRotate(data)
   })
 
 const tempGauge = new Gauge(document.getElementById('tempGauge')).setOptions({
@@ -353,6 +355,7 @@ setInterval(() => {
       updateSystemInfo(data)
       updateVisualizations(data)
       updateColorPickers()
+      updateTouchRaw(data)
 
       if (!isEditing) {
         document.getElementById('glancesHost').value = data.glances_host
@@ -397,6 +400,104 @@ function saveGlancesSettings() {
     .catch((error) => {
       console.error('Error:', error)
       alert('Failed to update Glances settings')
+    })
+}
+
+// --- Touch calibration ---
+let touchCalInitialized = false
+
+// Fill the calibration inputs once (and after a reset) so the 2s polling loop
+// doesn't overwrite values while you're editing them.
+function populateTouchCalibration(data) {
+  if (touchCalInitialized || data.touch_x_min === undefined) return
+  document.getElementById('touchXMin').value = data.touch_x_min
+  document.getElementById('touchXMax').value = data.touch_x_max
+  document.getElementById('touchYMin').value = data.touch_y_min
+  document.getElementById('touchYMax').value = data.touch_y_max
+  document.getElementById('touchSwapXY').checked = data.touch_swap_xy
+  document.getElementById('touchInvertX').checked = data.touch_invert_x
+  document.getElementById('touchInvertY').checked = data.touch_invert_y
+  touchCalInitialized = true
+}
+
+function updateTouchRaw(data) {
+  if (data.touch_raw_x === undefined) return
+  document.getElementById('touchRawLive').textContent =
+    data.touch_raw_x + ', ' + data.touch_raw_y
+}
+
+function saveTouchCalibration() {
+  fetch('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      touch_x_min: parseInt(document.getElementById('touchXMin').value),
+      touch_x_max: parseInt(document.getElementById('touchXMax').value),
+      touch_y_min: parseInt(document.getElementById('touchYMin').value),
+      touch_y_max: parseInt(document.getElementById('touchYMax').value),
+      touch_swap_xy: document.getElementById('touchSwapXY').checked,
+      touch_invert_x: document.getElementById('touchInvertX').checked,
+      touch_invert_y: document.getElementById('touchInvertY').checked
+    })
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.status === 'success') alert('Touch calibration saved!')
+    })
+    .catch((error) => {
+      console.error('Error:', error)
+      alert('Failed to save touch calibration')
+    })
+}
+
+function resetTouchCalibration() {
+  fetch('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reset_touch: true })
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.status !== 'success') return
+      touchCalInitialized = false // re-pull defaults into the inputs
+      return fetch('/settings')
+        .then((r) => r.json())
+        .then((d) => populateTouchCalibration(d))
+    })
+    .catch((error) => {
+      console.error('Error:', error)
+      alert('Failed to reset touch calibration')
+    })
+}
+
+// --- Auto-cycle pages ---
+let autoRotateInitialized = false
+
+function populateAutoRotate(data) {
+  if (autoRotateInitialized || data.auto_rotate === undefined) return
+  document.getElementById('autoRotate').checked = data.auto_rotate
+  document.getElementById('autoRotateInterval').value = data.auto_rotate_interval
+  autoRotateInitialized = true
+}
+
+function saveAutoRotate() {
+  let interval = parseInt(document.getElementById('autoRotateInterval').value)
+  if (!interval || interval < 1) interval = 1
+  fetch('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      auto_rotate: document.getElementById('autoRotate').checked,
+      auto_rotate_interval: interval
+    })
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.status === 'success') alert('Auto-cycle settings saved!')
+    })
+    .catch((error) => {
+      console.error('Error:', error)
+      alert('Failed to save auto-cycle settings')
     })
 }
 

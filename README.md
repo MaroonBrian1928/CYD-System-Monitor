@@ -7,7 +7,7 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
 > **Note — this fork.** This build targets the **dual-USB Cheap Yellow Display
 > (ESP32-2432S028, CH340, ST7789 panel)** and pulls from the **Glances v4 API**.
 > Relative to upstream it adds **GPU/VRAM monitoring**, a **touchscreen UI**
-> (swipe paging, a Docker container page, and tap-for-detail popups), a fix for
+> (tap-to-switch paging and a Docker container page), a fix for
 > the panel's color inversion, and a larger flash partition. The `platformio.ini`
 > here is **self-contained** — TFT_eSPI is configured entirely via build flags, so
 > you do not need an external Arduino libraries folder.
@@ -25,11 +25,13 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
   - Uptime
 
 - Touchscreen interface (XPT2046):
-  - **Swipe left/right** between pages (page-dot indicator at the bottom)
+  - **Tap the screen** to switch pages (page-dot indicator at the bottom)
   - **Page 1** — the metrics dashboard
   - **Page 2** — a live **Docker container** table (name / status / CPU% / memory),
     sorted by CPU, with color-coded status, scrollable for long lists
-  - **Tap any tile** on the dashboard for a detail popup of that metric
+  - **Auto-cycle pages** — optionally rotate through the UI pages on a
+    configurable timer (this cycles between pages; it does not change the screen
+    orientation). Toggle it and set the seconds-per-page from the web UI.
 
 - Web interface for configuration:
   - Real-time theme customization
@@ -121,16 +123,36 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
 ### Touchscreen calibration
 
 Touch uses the on-board **XPT2046** controller on a dedicated SPI bus
-(CLK 25, MOSI 32, MISO 39, CS 33, IRQ 36), configured in `include/touch.h`.
+(CLK 25, MOSI 32, MISO 39, CS 33, IRQ 36). Calibration is **stored in NVS and
+configurable from the web UI** (no reflashing) — resistive panels vary
+unit-to-unit, so each one may need tuning:
 
-Resistive panels vary unit-to-unit, so taps may need a one-time calibration:
+1. Open the web interface and find the **Touch Calibration** card.
+2. Press each corner of the device's screen and watch the **Live raw (X, Y)**
+   value update; note the raw min/max for X and Y.
+3. Enter those in the Raw X/Y min/max fields and click **Save Calibration** — it
+   applies instantly.
+4. If taps land on the wrong axis or are mirrored, toggle **Swap X/Y axes**,
+   **Invert X**, or **Invert Y** and save again.
+5. **Reset Calibration** restores the built-in defaults.
 
-1. Set `#define TOUCH_DEBUG 1` in `include/touch.h` and reflash.
-2. Open the serial monitor, tap the four corners, and note the raw min/max X/Y.
-3. Put those values in `TOUCH_RAW_X_MIN/MAX` and `TOUCH_RAW_Y_MIN/MAX`.
-4. If taps land on the wrong axis or are mirrored, flip `TOUCH_SWAP_XY`,
-   `TOUCH_INVERT_X`, or `TOUCH_INVERT_Y` (0/1).
-5. Set `TOUCH_DEBUG` back to `0` and reflash.
+If you already know a panel's values, set them once as **build flags** in
+`platformio.ini` so it flashes ready-to-use (no web config needed):
+
+```ini
+-D TOUCH_CAL_DEFAULT_X_MIN=390
+-D TOUCH_CAL_DEFAULT_X_MAX=3670
+-D TOUCH_CAL_DEFAULT_Y_MIN=300
+-D TOUCH_CAL_DEFAULT_Y_MAX=3750
+-D TOUCH_CAL_DEFAULT_SWAP_XY=true
+-D TOUCH_CAL_DEFAULT_INVERT_X=true
+-D TOUCH_CAL_DEFAULT_INVERT_Y=false
+```
+
+These only seed the NVS defaults (the web UI still overrides at runtime). If
+omitted, the fallback values in `include/settings_manager.h` are used. For
+low-level debugging you can also set `#define TOUCH_DEBUG 1` in `include/touch.h`
+to print raw + mapped coordinates to the serial monitor.
 
 ### Home Assistant Integration
 

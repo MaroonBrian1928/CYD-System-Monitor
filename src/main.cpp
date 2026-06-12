@@ -69,6 +69,8 @@ void setup()
     create_system_monitor_gui();
     touch_init();
     SettingsManager::begin();
+    gui_set_auto_rotate(SettingsManager::getAutoRotate(),
+                        SettingsManager::getAutoRotateInterval());
     if (!SPIFFS.begin(true))
     {
         Serial.println("SPIFFS Mount Failed");

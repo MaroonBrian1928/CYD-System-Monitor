@@ -8,6 +8,8 @@
 #include "SPIFFS.h"
 #include "FS.h"
 #include "display.h"
+#include "touch.h"
+#include "gui.h"
 
 #define TFT_BL 27
 #define TFT_BACKLIGHT_ON HIGH
@@ -79,7 +81,7 @@ void handleRoot()
 
 void handleGetSettings()
 {
-    StaticJsonDocument<1024> doc;
+    StaticJsonDocument<1536> doc;
 
     updateCPUUsage();
     doc["cpuUsage"] = (int)cpu_usage;
@@ -175,6 +177,23 @@ void handleGetSettings()
     doc["glances_host"] = SettingsManager::getGlancesHost();
     doc["glances_port"] = SettingsManager::getGlancesPort();
 
+    const TouchCalibration &tc = SettingsManager::getTouchCalibration();
+    doc["touch_x_min"] = tc.rawXMin;
+    doc["touch_x_max"] = tc.rawXMax;
+    doc["touch_y_min"] = tc.rawYMin;
+    doc["touch_y_max"] = tc.rawYMax;
+    doc["touch_swap_xy"] = tc.swapXY;
+    doc["touch_invert_x"] = tc.invertX;
+    doc["touch_invert_y"] = tc.invertY;
+
+    int16_t rawX, rawY;
+    touch_get_last_raw(rawX, rawY);
+    doc["touch_raw_x"] = rawX;
+    doc["touch_raw_y"] = rawY;
+
+    doc["auto_rotate"] = SettingsManager::getAutoRotate();
+    doc["auto_rotate_interval"] = SettingsManager::getAutoRotateInterval();
+
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
@@ -225,6 +244,43 @@ void handleUpdateSettings()
         if (doc.containsKey("glances_port"))
         {
             SettingsManager::setGlancesPort(doc["glances_port"].as<uint16_t>());
+        }
+        if (doc.containsKey("reset_touch") && doc["reset_touch"].as<bool>())
+        {
+            SettingsManager::resetTouchCalibration();
+        }
+        else if (doc.containsKey("touch_x_min") || doc.containsKey("touch_x_max") ||
+                 doc.containsKey("touch_y_min") || doc.containsKey("touch_y_max") ||
+                 doc.containsKey("touch_swap_xy") || doc.containsKey("touch_invert_x") ||
+                 doc.containsKey("touch_invert_y"))
+        {
+            // Apply only the provided fields on top of the current calibration.
+            TouchCalibration tc = SettingsManager::getTouchCalibration();
+            if (doc.containsKey("touch_x_min"))
+                tc.rawXMin = doc["touch_x_min"].as<uint16_t>();
+            if (doc.containsKey("touch_x_max"))
+                tc.rawXMax = doc["touch_x_max"].as<uint16_t>();
+            if (doc.containsKey("touch_y_min"))
+                tc.rawYMin = doc["touch_y_min"].as<uint16_t>();
+            if (doc.containsKey("touch_y_max"))
+                tc.rawYMax = doc["touch_y_max"].as<uint16_t>();
+            if (doc.containsKey("touch_swap_xy"))
+                tc.swapXY = doc["touch_swap_xy"].as<bool>();
+            if (doc.containsKey("touch_invert_x"))
+                tc.invertX = doc["touch_invert_x"].as<bool>();
+            if (doc.containsKey("touch_invert_y"))
+                tc.invertY = doc["touch_invert_y"].as<bool>();
+            SettingsManager::setTouchCalibration(tc);
+        }
+        if (doc.containsKey("auto_rotate") || doc.containsKey("auto_rotate_interval"))
+        {
+            if (doc.containsKey("auto_rotate"))
+                SettingsManager::setAutoRotate(doc["auto_rotate"].as<bool>());
+            if (doc.containsKey("auto_rotate_interval"))
+                SettingsManager::setAutoRotateInterval(doc["auto_rotate_interval"].as<uint16_t>());
+            // Apply immediately to the running UI.
+            gui_set_auto_rotate(SettingsManager::getAutoRotate(),
+                                SettingsManager::getAutoRotateInterval());
         }
         server.send(200, "application/json", "{\"status\":\"success\"}");
     }

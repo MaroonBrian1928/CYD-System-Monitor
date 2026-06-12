@@ -364,6 +364,95 @@
               </button>
             </div>
           </div>
+          <div class="card touch-card">
+            <h2><i class="ri-fingerprint-line"></i> Touch Calibration</h2>
+            <div class="theme-controls">
+              <p class="theme-warning">
+                <i class="ri-information-line"></i> Press each corner of the
+                device screen and watch the live raw values, then enter the
+                min/max below. Applies instantly &mdash; no reflash needed.
+              </p>
+              <div class="info-item">
+                <span class="info-label">Live raw (X, Y)</span>
+                <span class="info-value" id="touchRawLive">--, --</span>
+              </div>
+              <div class="color-picker">
+                <label>Raw X min</label>
+                <input type="number" id="touchXMin" class="text-input" />
+              </div>
+              <div class="color-picker">
+                <label>Raw X max</label>
+                <input type="number" id="touchXMax" class="text-input" />
+              </div>
+              <div class="color-picker">
+                <label>Raw Y min</label>
+                <input type="number" id="touchYMin" class="text-input" />
+              </div>
+              <div class="color-picker">
+                <label>Raw Y max</label>
+                <input type="number" id="touchYMax" class="text-input" />
+              </div>
+              <div class="color-picker">
+                <label>Swap X/Y axes</label>
+                <input type="checkbox" id="touchSwapXY" />
+              </div>
+              <div class="color-picker">
+                <label>Invert X</label>
+                <input type="checkbox" id="touchInvertX" />
+              </div>
+              <div class="color-picker">
+                <label>Invert Y</label>
+                <input type="checkbox" id="touchInvertY" />
+              </div>
+
+              <button
+                class="btn btn-success"
+                style="text-align: center; width: 100%"
+                onclick="saveTouchCalibration()">
+                <i class="ri-save-line"></i> Save Calibration
+              </button>
+              <button
+                class="btn btn-danger"
+                style="text-align: center; width: 100%; margin-top: 8px"
+                onclick="resetTouchCalibration()">
+                <i class="ri-refresh-line"></i> Reset Calibration
+              </button>
+            </div>
+          </div>
+          <div class="card rotate-card">
+            <h2><i class="ri-slideshow-line"></i> Auto-Cycle Pages</h2>
+            <div class="theme-controls">
+              <p class="theme-warning">
+                <i class="ri-information-line"></i> Automatically switches between
+                the on-screen UI pages (dashboard &harr; container list) on a
+                timer. This cycles pages &mdash; it does not rotate the screen
+                orientation.
+              </p>
+              <div class="color-picker">
+                <label>Enable auto-cycle</label>
+                <label class="switch">
+                  <input type="checkbox" id="autoRotate" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="color-picker">
+                <label>Seconds per page</label>
+                <input
+                  type="number"
+                  id="autoRotateInterval"
+                  class="text-input"
+                  min="1"
+                  placeholder="10" />
+              </div>
+
+              <button
+                class="btn btn-success"
+                style="text-align: center; width: 100%"
+                onclick="saveAutoRotate()">
+                <i class="ri-save-line"></i> Save
+              </button>
+            </div>
+          </div>
           <div class="card flash-card">
             <h2><i class="ri-sd-card-line"></i> Flash</h2>
             <div class="info-grid">
