@@ -34,4 +34,15 @@ extern lv_obj_t *vram_label;
 extern ArcWithLabel cpu_arc_obj;
 extern ArcWithLabel ram_arc_obj;
 
+// Page 2 (container list). The multi-line label is filled by glances_api.cpp;
+// gui_container_page_active() lets the data layer skip the fetch when hidden.
+extern lv_obj_t *container_label;
+bool gui_container_page_active();
+
+// Shared monospace (UNSCII_8) column layout so the header and the data rows
+// line up. Row uses LVGL recolor (#RRGGBB ...#) to tint the status column.
+//          name(15)        status(7)  cpu(5) mem(6)
+#define CONTAINER_HDR_FMT "%-15s %-7s %5s %6s"
+#define CONTAINER_ROW_FMT "%-15.15s #%06X %-7.7s# %5.1f %6s\n"
+
 #endif

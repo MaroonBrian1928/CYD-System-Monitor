@@ -4,6 +4,7 @@
 #include "config.h"
 #include "display.h"
 #include "gui.h"
+#include "touch.h"
 #include "glances_api.h"
 #include "settings_manager.h"
 #include "web_server.h"
@@ -66,6 +67,7 @@ void setup()
 #endif
 
     create_system_monitor_gui();
+    touch_init();
     SettingsManager::begin();
     if (!SPIFFS.begin(true))
     {

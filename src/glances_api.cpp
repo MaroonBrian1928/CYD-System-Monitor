@@ -83,6 +83,101 @@ void GlancesAPI::updateMemoryData(StaticJsonDocument<4096> &doc)
     }
 }
 
+void GlancesAPI::updateContainerData()
+{
+    // Only fetch when the container page is showing (the response is large).
+    if (!gui_container_page_active() || !container_label)
+        return;
+    if (WiFi.status() != WL_CONNECTED)
+        return;
+
+    HTTPClient http;
+    String url = "http://" + glances_host + ":" + String(glances_port) + "/api/4/containers";
+    http.begin(url);
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK)
+    {
+        http.end();
+        return;
+    }
+    String payload = http.getString();
+    http.end();
+
+    // Keep only the fields we render so the (large) response fits in memory.
+    StaticJsonDocument<192> filter;
+    filter[0]["name"] = true;
+    filter[0]["status"] = true;
+    filter[0]["cpu_percent"] = true;
+    filter[0]["memory_usage"] = true;
+
+    DynamicJsonDocument doc(8192);
+    if (deserializeJson(doc, payload, DeserializationOption::Filter(filter)))
+        return;
+
+    struct CRow
+    {
+        const char *name;
+        const char *status;
+        float cpu;
+        long memMB;
+    };
+    static const int MAXC = 24;
+    CRow rows[MAXC];
+    int n = 0;
+    for (JsonObject c : doc.as<JsonArray>())
+    {
+        if (n >= MAXC)
+            break;
+        rows[n].name = c["name"] | "?";
+        rows[n].status = c["status"] | "?";
+        rows[n].cpu = c["cpu_percent"] | 0.0f;
+        rows[n].memMB = (long)((c["memory_usage"] | 0LL) / (1024 * 1024));
+        n++;
+    }
+
+    // Sort by CPU descending (most active first), like the Glances UI.
+    for (int i = 1; i < n; i++)
+    {
+        CRow k = rows[i];
+        int j = i - 1;
+        while (j >= 0 && rows[j].cpu < k.cpu)
+        {
+            rows[j + 1] = rows[j];
+            j--;
+        }
+        rows[j + 1] = k;
+    }
+
+    String out;
+    out.reserve(n * 40 + 16);
+    char line[80];
+    char mem[12];
+    for (int i = 0; i < n; i++)
+    {
+        if (rows[i].memMB >= 1024)
+            snprintf(mem, sizeof(mem), "%.1fG", rows[i].memMB / 1024.0);
+        else
+            snprintf(mem, sizeof(mem), "%ldM", rows[i].memMB);
+
+        uint32_t color;
+        const char *s = rows[i].status;
+        if (strcmp(s, "running") == 0 || strcmp(s, "healthy") == 0)
+            color = 0x33D17A; // green
+        else if (strstr(s, "start") || strcmp(s, "paused") == 0)
+            color = 0xE5A50A; // amber
+        else
+            color = 0xE0504F; // red: exited/dead/unhealthy/...
+
+        snprintf(line, sizeof(line), CONTAINER_ROW_FMT,
+                 rows[i].name, (unsigned)color, rows[i].status, rows[i].cpu, mem);
+        out += line;
+    }
+    if (n == 0)
+        out = "No containers";
+
+    lv_label_set_text(container_label, out.c_str());
+}
+
 void updateGlancesData()
 {
     static unsigned long lastGlancesUpdate = 0;
@@ -183,6 +278,8 @@ void updateGlancesData()
             }
         }
     }
+
+    GlancesAPI::updateContainerData();
 
     lastGlancesUpdate = millis();
 }

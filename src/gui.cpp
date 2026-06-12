@@ -16,6 +16,31 @@ lv_obj_t *vram_label = NULL;
 ArcWithLabel cpu_arc_obj = {NULL, NULL};
 ArcWithLabel ram_arc_obj = {NULL, NULL};
 
+// ---- Touch UI state: swipe paging + tap-for-detail ------------------------
+#define PAGE_COUNT 2
+
+enum MetricId
+{
+    M_CPU,
+    M_RAM,
+    M_TEMP,
+    M_GPU,
+    M_VRAM,
+    M_DISK,
+    M_UPTIME,
+    M_NETWORK,
+    M_END
+};
+
+static lv_obj_t *pages[PAGE_COUNT] = {NULL, NULL};
+static lv_obj_t *page_dots[PAGE_COUNT] = {NULL, NULL};
+static int current_page = 0;
+static lv_obj_t *detail_overlay = NULL;
+
+// Page 2 (Docker containers). Populated from Glances by glances_api.cpp; the
+// label holds one line per container (name / CPU% / memory).
+lv_obj_t *container_label = NULL;
+
 ArcWithLabel create_arc(lv_obj_t *parent, const char *text, lv_color_t color)
 {
     ArcWithLabel result = {nullptr, nullptr};
@@ -307,14 +332,280 @@ void applyTheme(bool darkMode)
             }
         }
     }
+
+    // Keep the container page legible after a theme change.
+    if (container_label)
+        lv_obj_set_style_text_color(container_label, theme.text_color, 0);
+}
+
+// ---- Touch UI helpers -----------------------------------------------------
+
+static const char *metric_name(MetricId id)
+{
+    switch (id)
+    {
+    case M_CPU:
+        return "CPU";
+    case M_RAM:
+        return "RAM";
+    case M_TEMP:
+        return "Temperature";
+    case M_GPU:
+        return "GPU";
+    case M_VRAM:
+        return "VRAM";
+    case M_DISK:
+        return "Disk";
+    case M_UPTIME:
+        return "Uptime";
+    case M_NETWORK:
+        return "Network";
+    default:
+        return "";
+    }
+}
+
+// Current displayed text of a compact label (stored as its user_data child).
+static const char *compact_value(lv_obj_t *compact)
+{
+    if (!compact)
+        return "--";
+    lv_obj_t *t = (lv_obj_t *)lv_obj_get_user_data(compact);
+    return (t) ? lv_label_get_text(t) : "--";
+}
+
+// Current text of one of an arc's three internal labels (title/value/info).
+static const char *arc_text(ArcWithLabel &a, int idx)
+{
+    if (!a.arc)
+        return "--";
+    lv_obj_t **labels = (lv_obj_t **)lv_obj_get_user_data(a.arc);
+    return (labels && labels[idx]) ? lv_label_get_text(labels[idx]) : "--";
+}
+
+// Compose the live value string for a metric (read from the dashboard widgets).
+static void metric_value(MetricId id, char *buf, size_t n)
+{
+    switch (id)
+    {
+    case M_CPU:
+        snprintf(buf, n, "%s  (%s)", arc_text(cpu_arc_obj, 2), arc_text(cpu_arc_obj, 1));
+        break;
+    case M_RAM:
+        snprintf(buf, n, "%s  %s", arc_text(ram_arc_obj, 1), arc_text(ram_arc_obj, 2));
+        break;
+    case M_TEMP:
+        snprintf(buf, n, "%s", compact_value(temp_label));
+        break;
+    case M_GPU:
+        snprintf(buf, n, "%s", compact_value(gpu_label));
+        break;
+    case M_VRAM:
+        snprintf(buf, n, "%s", compact_value(vram_label));
+        break;
+    case M_DISK:
+        snprintf(buf, n, "%s", compact_value(disk_label));
+        break;
+    case M_UPTIME:
+        snprintf(buf, n, "%s", compact_value(uptime_label));
+        break;
+    case M_NETWORK:
+        snprintf(buf, n, "%s", compact_value(network_label));
+        break;
+    default:
+        buf[0] = '\0';
+    }
+}
+
+// ---- Tap-for-detail overlay ----------------------------------------------
+
+static void close_detail(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    if (detail_overlay)
+    {
+        lv_obj_del(detail_overlay);
+        detail_overlay = NULL;
+    }
+}
+
+static void show_detail(MetricId id)
+{
+    if (detail_overlay)
+        lv_obj_del(detail_overlay);
+    const ThemeColors &theme = SettingsManager::getCurrentTheme();
+
+    // Dimmed full-screen backdrop; tapping outside the card closes it.
+    detail_overlay = lv_obj_create(lv_scr_act());
+    lv_obj_remove_style_all(detail_overlay);
+    lv_obj_set_size(detail_overlay, 320, 240);
+    lv_obj_center(detail_overlay);
+    lv_obj_set_style_bg_color(detail_overlay, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(detail_overlay, LV_OPA_50, 0);
+    lv_obj_clear_flag(detail_overlay, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(detail_overlay, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(detail_overlay, close_detail, LV_EVENT_CLICKED, NULL);
+
+    // Centered card (absorbs taps so it doesn't dismiss the overlay).
+    lv_obj_t *card = lv_obj_create(detail_overlay);
+    lv_obj_set_size(card, 240, 150);
+    lv_obj_center(card);
+    lv_obj_set_style_bg_color(card, theme.card_bg_color, 0);
+    lv_obj_set_style_border_color(card, theme.border_color, 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_radius(card, 8, 0);
+    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(card, 14, 0);
+
+    lv_obj_t *title = lv_label_create(card);
+    lv_label_set_text(title, metric_name(id));
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(title, theme.text_color, 0);
+
+    char buf[64];
+    metric_value(id, buf, sizeof(buf));
+    lv_obj_t *value = lv_label_create(card);
+    lv_label_set_text(value, buf);
+    lv_obj_set_style_text_font(value, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(value, theme.text_color, 0);
+
+    lv_obj_t *btn = lv_btn_create(card);
+    lv_obj_set_style_bg_color(btn, theme.bg_color, 0);
+    lv_obj_set_style_border_color(btn, theme.border_color, 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_add_event_cb(btn, close_detail, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *blabel = lv_label_create(btn);
+    lv_label_set_text(blabel, LV_SYMBOL_CLOSE " Close");
+    lv_obj_set_style_text_color(blabel, theme.text_color, 0);
+    lv_obj_center(blabel);
+}
+
+static void tile_clicked(lv_event_t *e)
+{
+    MetricId id = (MetricId)(intptr_t)lv_event_get_user_data(e);
+    show_detail(id);
+}
+
+static void make_tappable(lv_obj_t *tile, MetricId id)
+{
+    if (!tile)
+        return;
+    lv_obj_add_flag(tile, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(tile, tile_clicked, LV_EVENT_CLICKED, (void *)(intptr_t)id);
+}
+
+// ---- Swipe paging ---------------------------------------------------------
+
+static void update_dots()
+{
+    for (int i = 0; i < PAGE_COUNT; i++)
+    {
+        if (page_dots[i])
+            lv_obj_set_style_bg_opa(page_dots[i], i == current_page ? LV_OPA_COVER : LV_OPA_30, 0);
+    }
+}
+
+static void switch_page(int delta)
+{
+    int next = current_page + delta;
+    if (next < 0 || next >= PAGE_COUNT)
+        return;
+    lv_obj_add_flag(pages[current_page], LV_OBJ_FLAG_HIDDEN);
+    current_page = next;
+    lv_obj_clear_flag(pages[current_page], LV_OBJ_FLAG_HIDDEN);
+    update_dots();
+}
+
+bool gui_container_page_active()
+{
+    return current_page == 1;
+}
+
+static void screen_gesture(lv_event_t *e)
+{
+    LV_UNUSED(e);
+    if (detail_overlay)
+        return; // a detail popup is open; ignore swipes
+    lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
+    if (dir == LV_DIR_LEFT)
+        switch_page(+1);
+    else if (dir == LV_DIR_RIGHT)
+        switch_page(-1);
+}
+
+// Let gestures from any descendant bubble up to the screen handler.
+static void enable_gesture_bubble(lv_obj_t *obj)
+{
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    uint32_t cnt = lv_obj_get_child_cnt(obj);
+    for (uint32_t i = 0; i < cnt; i++)
+        enable_gesture_bubble(lv_obj_get_child(obj, i));
+}
+
+static void build_container_page(lv_obj_t *parent, const ThemeColors *theme)
+{
+    lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_all(parent, 8, 0);
+    lv_obj_set_style_pad_row(parent, 4, 0);
+
+    lv_obj_t *header = lv_label_create(parent);
+    lv_label_set_text(header, LV_SYMBOL_LIST " Containers");
+    lv_obj_set_style_text_font(header, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(header, theme->cpu_color, 0);
+
+    // Monospace column header, generated from the shared layout so it lines up
+    // with the data rows produced in glances_api.cpp::updateContainerData().
+    char hdr[40];
+    snprintf(hdr, sizeof(hdr), CONTAINER_HDR_FMT, "Name", "Status", "CPU%", "MEM");
+    lv_obj_t *colhead = lv_label_create(parent);
+    lv_label_set_text(colhead, hdr);
+    lv_obj_set_style_text_font(colhead, &lv_font_unscii_8, 0);
+    lv_obj_set_style_text_color(colhead, lv_color_hex(0x808080), 0);
+
+    // Scrollable viewport holding one multi-line label (a row per container).
+    lv_obj_t *view = lv_obj_create(parent);
+    lv_obj_remove_style_all(view);
+    lv_obj_set_width(view, lv_pct(100));
+    lv_obj_set_flex_grow(view, 1);
+    lv_obj_set_style_pad_all(view, 0, 0);
+    lv_obj_set_scroll_dir(view, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(view, LV_SCROLLBAR_MODE_AUTO);
+
+    container_label = lv_label_create(view);
+    lv_label_set_long_mode(container_label, LV_LABEL_LONG_WRAP);
+    lv_label_set_recolor(container_label, true); // colours the status column
+    lv_obj_set_width(container_label, lv_pct(100));
+    lv_obj_set_style_text_font(container_label, &lv_font_unscii_8, 0);
+    lv_obj_set_style_text_color(container_label, theme->text_color, 0);
+    lv_label_set_text(container_label, "Loading containers...");
 }
 
 void create_system_monitor_gui()
 {
     const ThemeColors *theme = DARK_MODE ? &dark_theme : &light_theme;
     lv_obj_set_style_bg_color(lv_scr_act(), theme->bg_color, 0);
+    lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *main_cont = lv_obj_create(lv_scr_act());
+    // Transparent full-screen page containers; only the active one is shown.
+    for (int i = 0; i < PAGE_COUNT; i++)
+    {
+        lv_obj_t *page = lv_obj_create(lv_scr_act());
+        lv_obj_remove_style_all(page);
+        lv_obj_set_size(page, 320, 240);
+        lv_obj_center(page);
+        lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
+        pages[i] = page;
+        if (i != 0)
+            lv_obj_add_flag(page, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // ---- Page 0: the existing dashboard ----
+    lv_obj_t *main_cont = lv_obj_create(pages[0]);
     if (!main_cont)
         return;
 
@@ -340,6 +631,7 @@ void create_system_monitor_gui()
     lv_obj_set_style_border_width(left_col, 0, 0);
     lv_obj_set_flex_flow(left_col, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(left_col, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(left_col, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_set_size(right_col, 158, 240);
     lv_obj_set_style_pad_all(right_col, 2, 0);
@@ -347,6 +639,7 @@ void create_system_monitor_gui()
     lv_obj_set_style_border_width(right_col, 0, 0);
     lv_obj_set_flex_flow(right_col, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(right_col, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(right_col, LV_OBJ_FLAG_SCROLLABLE);
 
     cpu_arc_obj = create_arc(left_col, "CPU", theme->cpu_color);
     if (!cpu_arc_obj.arc || !cpu_arc_obj.label)
@@ -379,6 +672,44 @@ void create_system_monitor_gui()
     network_label = create_compact_label(right_col, LV_SYMBOL_DOWNLOAD " --- " LV_SYMBOL_UPLOAD " ---", theme);
     if (!network_label)
         return;
+
+    // Make each dashboard tile tap-to-detail. The arcs' centre containers are
+    // used (not the arc itself) so taps don't disturb the arc value.
+    make_tappable(cpu_arc_obj.label, M_CPU);
+    make_tappable(ram_arc_obj.label, M_RAM);
+    make_tappable(temp_label, M_TEMP);
+    make_tappable(gpu_label, M_GPU);
+    make_tappable(uptime_label, M_UPTIME);
+    make_tappable(disk_label, M_DISK);
+    make_tappable(vram_label, M_VRAM);
+    make_tappable(network_label, M_NETWORK);
+
+    // ---- Page 1: Docker container list (populated by glances_api.cpp) ----
+    build_container_page(pages[1], theme);
+
+    // Page indicator dots (kept above the pages so they persist across swipes).
+    lv_obj_t *dots = lv_obj_create(lv_scr_act());
+    lv_obj_remove_style_all(dots);
+    lv_obj_set_size(dots, 64, 12);
+    lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, -2);
+    lv_obj_set_flex_flow(dots, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(dots, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(dots, 6, 0);
+    lv_obj_clear_flag(dots, LV_OBJ_FLAG_SCROLLABLE);
+    for (int i = 0; i < PAGE_COUNT; i++)
+    {
+        lv_obj_t *d = lv_obj_create(dots);
+        lv_obj_remove_style_all(d);
+        lv_obj_set_size(d, 8, 8);
+        lv_obj_set_style_radius(d, 4, 0);
+        lv_obj_set_style_bg_color(d, theme->cpu_color, 0);
+        lv_obj_set_style_bg_opa(d, i == 0 ? LV_OPA_COVER : LV_OPA_30, 0);
+        page_dots[i] = d;
+    }
+
+    // Wire up swipe handling and the details auto-refresh.
+    enable_gesture_bubble(lv_scr_act());
+    lv_obj_add_event_cb(lv_scr_act(), screen_gesture, LV_EVENT_GESTURE, NULL);
 
     SettingsManager::setThemeChangeCallback(applyTheme);
 

@@ -1,20 +1,35 @@
 # CYD System Monitor (ESP32 "Cheap Yellow Display")
 
-A sleek system monitoring display powered by ESP32 that shows real-time system metrics from a Glances server. Features a customizable UI with dark/light theme support using LVGL graphics library and power-saving display controls.
+A sleek system monitoring display powered by ESP32 that shows real-time system metrics from a Glances server. Features a customizable UI with dark/light theme support using LVGL graphics library, a **touchscreen interface**, and power-saving display controls.
 
 ![Unraid](Images/device.jpeg)
+
+> **Note — this fork.** This build targets the **dual-USB Cheap Yellow Display
+> (ESP32-2432S028, CH340, ST7789 panel)** and pulls from the **Glances v4 API**.
+> Relative to upstream it adds **GPU/VRAM monitoring**, a **touchscreen UI**
+> (swipe paging, a Docker container page, and tap-for-detail popups), a fix for
+> the panel's color inversion, and a larger flash partition. The `platformio.ini`
+> here is **self-contained** — TFT_eSPI is configured entirely via build flags, so
+> you do not need an external Arduino libraries folder.
 
 ## Features
 
 - Real-time monitoring of:
-  - CPU usage with core count and load average
+  - CPU usage with core count
   - RAM utilization with total capacity
-  - Disk array usage percentage
-  - Cache usage percentage
+  - Disk usage percentage
+  - GPU utilization (NVIDIA, via the Glances `gpu` plugin)
+  - VRAM utilization
   - System temperature with color-coded warnings
   - Network traffic (upload/download) with auto-scaling units (B/KB/MB)
-  - System load
   - Uptime
+
+- Touchscreen interface (XPT2046):
+  - **Swipe left/right** between pages (page-dot indicator at the bottom)
+  - **Page 1** — the metrics dashboard
+  - **Page 2** — a live **Docker container** table (name / status / CPU% / memory),
+    sorted by CPU, with color-coded status, scrollable for long lists
+  - **Tap any tile** on the dashboard for a detail popup of that metric
 
 - Web interface for configuration:
   - Real-time theme customization
@@ -43,8 +58,16 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
 1. Clone this repository
 2. Open the project in PlatformIO
 
-   - Rename the `platformio.example.ini` file to `platformio.ini`
-   - Edit the `platformio.ini` file to set the correct path to your Arduino libraries
+   - Copy the config into place (`platformio.ini` is gitignored):
+
+     ```bash
+     cp platformio.example.ini platformio.ini
+     ```
+
+   - This config is **self-contained** and ready to build for the dual-USB CYD —
+     TFT_eSPI is configured via build flags and LVGL/ArduinoJson/XPT2046 are pulled
+     in as managed dependencies. You do **not** need an external Arduino libraries
+     folder.
 
 3. Configure your TFT display settings:
    - Modify TFT_eSPI settings according to your display's configuration
@@ -77,6 +100,37 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
    - Configure the Glances server IP address and port
    - Choose theme colors if you want to change them
    - Save the configuration
+
+### Display & flashing notes (this fork)
+
+- **Color inversion fix.** The dual-USB CYD's ST7789 panel renders inverted by
+  default (dark theme shows as light, cyan as red, purple as green). This is
+  corrected with `-D TFT_INVERSION_OFF` in `platformio.ini`. If your panel ever
+  looks like a photo negative, switch it to `TFT_INVERSION_ON`.
+- **Partition scheme.** `platformio.ini` sets `board_build.partitions =
+  min_spiffs.csv` (1.9 MB app / ~190 KB SPIFFS) to make room for the touch UI.
+  Because the partition layout differs from the default, you must run the
+  filesystem upload **once** after flashing firmware so the web UI is re-written
+  to the new SPIFFS region:
+
+  ```bash
+  pio run -t upload      # firmware
+  pio run -t uploadfs    # web UI (one-time, after the partition change)
+  ```
+
+### Touchscreen calibration
+
+Touch uses the on-board **XPT2046** controller on a dedicated SPI bus
+(CLK 25, MOSI 32, MISO 39, CS 33, IRQ 36), configured in `include/touch.h`.
+
+Resistive panels vary unit-to-unit, so taps may need a one-time calibration:
+
+1. Set `#define TOUCH_DEBUG 1` in `include/touch.h` and reflash.
+2. Open the serial monitor, tap the four corners, and note the raw min/max X/Y.
+3. Put those values in `TOUCH_RAW_X_MIN/MAX` and `TOUCH_RAW_Y_MIN/MAX`.
+4. If taps land on the wrong axis or are mirrored, flip `TOUCH_SWAP_XY`,
+   `TOUCH_INVERT_X`, or `TOUCH_INVERT_Y` (0/1).
+5. Set `TOUCH_DEBUG` back to `0` and reflash.
 
 ### Home Assistant Integration
 
