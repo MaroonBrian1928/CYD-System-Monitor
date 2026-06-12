@@ -2,6 +2,7 @@
 #include "config.h"
 #include "gui.h"
 #include "settings_manager.h"
+#include "display.h"
 #include <Arduino.h>
 #include <SPI.h>
 #include <XPT2046_Touchscreen.h>
@@ -12,6 +13,12 @@
 // VSPI double-claims the peripheral and crash-loops the device at boot.
 static SPIClass touchSPI(HSPI);
 static XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
+
+// Backlight idle-sleep state.
+static uint32_t backlight_timeout_ms = 0; // 0 = never sleep
+static uint32_t last_activity_ms = 0;
+static bool screen_asleep = false;
+static bool wake_swallow = false; // ignore the touch that wakes the screen
 
 // Landscape screen geometry (rotation 3): 320 wide x 240 tall.
 static const int16_t SCREEN_W = 320;
@@ -75,9 +82,38 @@ static void touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
     static int16_t last_x, last_y;
     static int release_count = 0;
 
+    // Read and validate the sample first. This XPT2046 emits phantom "rail"
+    // samples (e.g. raw (4095,0)) as electrical noise -- often a continuous
+    // stream after a screen redraw -- which would otherwise look like a finger
+    // stuck in the corner and block every later tap. A real press always lands
+    // inside the panel's range, so reject anything at/near the rails.
+    bool touched = false;
+    TS_Point p;
     if (ts.touched())
     {
-        TS_Point p = ts.getPoint();
+        p = ts.getPoint();
+        if (p.x > 100 && p.x < 4000 && p.y > 100 && p.y < 4000)
+            touched = true;
+    }
+
+    if (touched)
+    {
+        last_activity_ms = millis();
+
+        // If the screen had gone to sleep, this touch only wakes it -- swallow
+        // the whole press so it isn't also treated as a page change.
+        if (screen_asleep)
+        {
+            display_sleep(false);
+            screen_asleep = false;
+            wake_swallow = true;
+        }
+        if (wake_swallow)
+        {
+            data->state = LV_INDEV_STATE_REL;
+            return;
+        }
+
         last_raw_x = p.x;
         last_raw_y = p.y;
         int16_t x, y;
@@ -97,6 +133,9 @@ static void touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
         return;
     }
 
+    // Finger lifted: a swallowed wake-touch is now finished.
+    wake_swallow = false;
+
     // Not currently touched. Bridge short dropouts by holding the last press.
     if (pressed && release_count < RELEASE_DEBOUNCE)
     {
@@ -112,10 +151,38 @@ static void touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
     {
         pressed = false;
         release_count = 0;
+#if TOUCH_DEBUG
+        Serial.println("[touch] tap released -> gui_next_page()");
+#endif
         gui_next_page();
     }
 
     data->state = LV_INDEV_STATE_REL;
+}
+
+// Periodically turns the screen off after the configured idle time.
+static void idle_timer_cb(lv_timer_t *t)
+{
+    LV_UNUSED(t);
+    if (backlight_timeout_ms == 0 || screen_asleep)
+        return;
+    if (millis() - last_activity_ms >= backlight_timeout_ms)
+    {
+        display_sleep(true);
+        screen_asleep = true;
+    }
+}
+
+void touch_set_backlight_timeout(uint32_t seconds)
+{
+    backlight_timeout_ms = seconds * 1000UL;
+    last_activity_ms = millis();
+    // If sleeping was just disabled, make sure the screen is on.
+    if (backlight_timeout_ms == 0 && screen_asleep)
+    {
+        display_sleep(false);
+        screen_asleep = false;
+    }
 }
 
 void touch_init()
@@ -129,6 +196,9 @@ void touch_init()
     indev_drv.type = LV_INDEV_TYPE_POINTER;
     indev_drv.read_cb = touchpad_read;
     lv_indev_drv_register(&indev_drv);
+
+    last_activity_ms = millis();
+    lv_timer_create(idle_timer_cb, 1000, NULL); // checks the idle timeout
 
     Serial.println("Touch initialized (XPT2046)");
 }

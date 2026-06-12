@@ -20,6 +20,7 @@ TouchCalibration SettingsManager::touchCal = {
 
 bool SettingsManager::autoRotate = false;
 uint16_t SettingsManager::autoRotateInterval = 10;
+uint16_t SettingsManager::backlightTimeout = 0;
 
 void SettingsManager::begin()
 {
@@ -42,6 +43,7 @@ void SettingsManager::begin()
 
     autoRotate = preferences.getBool("auto_rotate", false);
     autoRotateInterval = preferences.getUShort("rotate_secs", 10);
+    backlightTimeout = preferences.getUShort("bl_timeout", 0);
 
     mutable_dark_theme = dark_theme;
     mutable_light_theme = light_theme;
@@ -230,4 +232,15 @@ void SettingsManager::setAutoRotateInterval(uint16_t seconds)
         seconds = 1;
     autoRotateInterval = seconds;
     preferences.putUShort("rotate_secs", seconds);
+}
+
+uint16_t SettingsManager::getBacklightTimeout()
+{
+    return backlightTimeout;
+}
+
+void SettingsManager::setBacklightTimeout(uint16_t seconds)
+{
+    backlightTimeout = seconds;
+    preferences.putUShort("bl_timeout", seconds);
 }

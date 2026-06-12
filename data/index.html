@@ -376,32 +376,34 @@
                 <span class="info-label">Live raw (X, Y)</span>
                 <span class="info-value" id="touchRawLive">--, --</span>
               </div>
-              <div class="color-picker">
-                <label>Raw X min</label>
-                <input type="number" id="touchXMin" class="text-input" />
+              <div class="settings-grid">
+                <div class="setting-field">
+                  <label for="touchXMin">Raw X min</label>
+                  <input type="number" id="touchXMin" class="text-input" />
+                </div>
+                <div class="setting-field">
+                  <label for="touchXMax">Raw X max</label>
+                  <input type="number" id="touchXMax" class="text-input" />
+                </div>
+                <div class="setting-field">
+                  <label for="touchYMin">Raw Y min</label>
+                  <input type="number" id="touchYMin" class="text-input" />
+                </div>
+                <div class="setting-field">
+                  <label for="touchYMax">Raw Y max</label>
+                  <input type="number" id="touchYMax" class="text-input" />
+                </div>
               </div>
-              <div class="color-picker">
-                <label>Raw X max</label>
-                <input type="number" id="touchXMax" class="text-input" />
-              </div>
-              <div class="color-picker">
-                <label>Raw Y min</label>
-                <input type="number" id="touchYMin" class="text-input" />
-              </div>
-              <div class="color-picker">
-                <label>Raw Y max</label>
-                <input type="number" id="touchYMax" class="text-input" />
-              </div>
-              <div class="color-picker">
-                <label>Swap X/Y axes</label>
+              <div class="setting-toggle">
+                <label for="touchSwapXY">Swap X/Y axes</label>
                 <input type="checkbox" id="touchSwapXY" />
               </div>
-              <div class="color-picker">
-                <label>Invert X</label>
+              <div class="setting-toggle">
+                <label for="touchInvertX">Invert X</label>
                 <input type="checkbox" id="touchInvertX" />
               </div>
-              <div class="color-picker">
-                <label>Invert Y</label>
+              <div class="setting-toggle">
+                <label for="touchInvertY">Invert Y</label>
                 <input type="checkbox" id="touchInvertY" />
               </div>
 
@@ -428,15 +430,15 @@
                 timer. This cycles pages &mdash; it does not rotate the screen
                 orientation.
               </p>
-              <div class="color-picker">
-                <label>Enable auto-cycle</label>
+              <div class="setting-toggle">
+                <label for="autoRotate">Enable auto-cycle</label>
                 <label class="switch">
                   <input type="checkbox" id="autoRotate" />
                   <span class="slider"></span>
                 </label>
               </div>
-              <div class="color-picker">
-                <label>Seconds per page</label>
+              <div class="setting-field">
+                <label for="autoRotateInterval">Seconds per page</label>
                 <input
                   type="number"
                   id="autoRotateInterval"
@@ -449,6 +451,31 @@
                 class="btn btn-success"
                 style="text-align: center; width: 100%"
                 onclick="saveAutoRotate()">
+                <i class="ri-save-line"></i> Save
+              </button>
+            </div>
+          </div>
+          <div class="card screen-timeout-card">
+            <h2><i class="ri-moon-line"></i> Screen Timeout</h2>
+            <div class="theme-controls">
+              <p class="theme-warning">
+                <i class="ri-information-line"></i> Turn the screen off after a
+                period of no touch, to save power and reduce burn-in. Tap the
+                screen to wake it (that tap won't change the page).
+              </p>
+              <div class="setting-field">
+                <label for="backlightTimeout">Screen off after (seconds, 0 = never)</label>
+                <input
+                  type="number"
+                  id="backlightTimeout"
+                  class="text-input"
+                  min="0"
+                  placeholder="0" />
+              </div>
+              <button
+                class="btn btn-success"
+                style="text-align: center; width: 100%"
+                onclick="saveBacklightTimeout()">
                 <i class="ri-save-line"></i> Save
               </button>
             </div>

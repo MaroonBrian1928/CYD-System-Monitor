@@ -24,8 +24,10 @@ static lv_obj_t *page_dots[PAGE_COUNT] = {NULL, NULL};
 static int current_page = 0;
 
 // Page 2 (Docker containers). Populated from Glances by glances_api.cpp; the
-// label holds one line per container (name / CPU% / memory).
+// label holds one line per container (name / CPU% / memory). container_header is
+// the title label, updated with the live container count.
 lv_obj_t *container_label = NULL;
+lv_obj_t *container_header = NULL;
 
 ArcWithLabel create_arc(lv_obj_t *parent, const char *text, lv_color_t color)
 {
@@ -330,8 +332,14 @@ static void update_dots()
 {
     for (int i = 0; i < PAGE_COUNT; i++)
     {
-        if (page_dots[i])
-            lv_obj_set_style_bg_opa(page_dots[i], i == current_page ? LV_OPA_COVER : LV_OPA_30, 0);
+        if (!page_dots[i])
+            continue;
+        bool active = (i == current_page);
+        // Active dot: full opacity and larger; inactive: dim and small.
+        lv_obj_set_style_bg_opa(page_dots[i], active ? LV_OPA_COVER : LV_OPA_20, 0);
+        int sz = active ? 9 : 5;
+        lv_obj_set_size(page_dots[i], sz, sz);
+        lv_obj_set_style_radius(page_dots[i], sz / 2, 0);
     }
 }
 
@@ -402,11 +410,12 @@ static void build_container_page(lv_obj_t *parent, const ThemeColors *theme)
     lv_label_set_text(header, LV_SYMBOL_LIST " Containers");
     lv_obj_set_style_text_font(header, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(header, theme->cpu_color, 0);
+    container_header = header;
 
     // Monospace column header, generated from the shared layout so it lines up
     // with the data rows produced in glances_api.cpp::updateContainerData().
     char hdr[40];
-    snprintf(hdr, sizeof(hdr), CONTAINER_HDR_FMT, "Name", "Status", "CPU%", "MEM");
+    snprintf(hdr, sizeof(hdr), CONTAINER_HDR_FMT, "Name", "CPU%", "MEM");
     lv_obj_t *colhead = lv_label_create(parent);
     lv_label_set_text(colhead, hdr);
     lv_obj_set_style_text_font(colhead, &lv_font_unscii_8, 0);
@@ -525,21 +534,19 @@ void create_system_monitor_gui()
     lv_obj_t *dots = lv_obj_create(lv_scr_act());
     lv_obj_remove_style_all(dots);
     lv_obj_set_size(dots, 64, 12);
-    lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, -2);
+    lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, -6);
     lv_obj_set_flex_flow(dots, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(dots, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(dots, 6, 0);
+    lv_obj_set_style_pad_column(dots, 8, 0);
     lv_obj_clear_flag(dots, LV_OBJ_FLAG_SCROLLABLE);
     for (int i = 0; i < PAGE_COUNT; i++)
     {
         lv_obj_t *d = lv_obj_create(dots);
         lv_obj_remove_style_all(d);
-        lv_obj_set_size(d, 8, 8);
-        lv_obj_set_style_radius(d, 4, 0);
         lv_obj_set_style_bg_color(d, theme->cpu_color, 0);
-        lv_obj_set_style_bg_opa(d, i == 0 ? LV_OPA_COVER : LV_OPA_30, 0);
         page_dots[i] = d;
     }
+    update_dots(); // sets per-dot size/opacity for the active page
 
     // Swipe handling is done in the touch driver, which calls gui_on_swipe().
 

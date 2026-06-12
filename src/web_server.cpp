@@ -193,6 +193,7 @@ void handleGetSettings()
 
     doc["auto_rotate"] = SettingsManager::getAutoRotate();
     doc["auto_rotate_interval"] = SettingsManager::getAutoRotateInterval();
+    doc["backlight_timeout"] = SettingsManager::getBacklightTimeout();
 
     String response;
     serializeJson(doc, response);
@@ -281,6 +282,12 @@ void handleUpdateSettings()
             // Apply immediately to the running UI.
             gui_set_auto_rotate(SettingsManager::getAutoRotate(),
                                 SettingsManager::getAutoRotateInterval());
+        }
+        if (doc.containsKey("backlight_timeout"))
+        {
+            uint16_t secs = doc["backlight_timeout"].as<uint16_t>();
+            SettingsManager::setBacklightTimeout(secs);
+            touch_set_backlight_timeout(secs);
         }
         server.send(200, "application/json", "{\"status\":\"success\"}");
     }

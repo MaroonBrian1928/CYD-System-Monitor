@@ -32,6 +32,9 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
   - **Auto-cycle pages** — optionally rotate through the UI pages on a
     configurable timer (this cycles between pages; it does not change the screen
     orientation). Toggle it and set the seconds-per-page from the web UI.
+  - **Screen timeout** — optionally turn the screen off after a configurable
+    period of no touch (saves power / reduces burn-in); tap to wake (the wake tap
+    does not change the page). Configured from the web UI (0 = never).
 
 - Web interface for configuration:
   - Real-time theme customization

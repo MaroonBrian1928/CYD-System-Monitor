@@ -72,6 +72,10 @@ public:
     static void setAutoRotate(bool enabled);
     static void setAutoRotateInterval(uint16_t seconds);
 
+    // Seconds of touch inactivity before the screen turns off (0 = never).
+    static uint16_t getBacklightTimeout();
+    static void setBacklightTimeout(uint16_t seconds);
+
     static ThemeCallback themeCallback;
 
 private:
@@ -83,4 +87,5 @@ private:
     static TouchCalibration touchCal;
     static bool autoRotate;
     static uint16_t autoRotateInterval;
+    static uint16_t backlightTimeout;
 };

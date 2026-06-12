@@ -36,7 +36,9 @@ extern ArcWithLabel ram_arc_obj;
 
 // Page 2 (container list). The multi-line label is filled by glances_api.cpp;
 // gui_container_page_active() lets the data layer skip the fetch when hidden.
+// container_header is the title label, updated with the live container count.
 extern lv_obj_t *container_label;
+extern lv_obj_t *container_header;
 bool gui_container_page_active();
 
 // Called by the touch driver on each tap to advance to the next page (wraps).
@@ -46,10 +48,12 @@ void gui_next_page();
 // long each page is shown before advancing.
 void gui_set_auto_rotate(bool enabled, uint32_t interval_sec);
 
-// Shared monospace (UNSCII_8) column layout so the header and the data rows
-// line up. Row uses LVGL recolor (#RRGGBB ...#) to tint the status column.
-//          name(15)        status(7)  cpu(5) mem(6)
-#define CONTAINER_HDR_FMT "%-15s %-7s %5s %6s"
-#define CONTAINER_ROW_FMT "%-15.15s #%06X %-7.7s# %5.1f %6s\n"
+// Shared monospace (UNSCII_8) column layout so the header and the data rows line
+// up. The status is a recolored "*" marker (UNSCII is ASCII-only, so no real
+// bullet glyph); green = running/healthy, amber = starting/paused, red = other.
+// Widths chosen to fill the 320px width (~38 mono chars) without wrapping.
+//          dot(1) name(23)            cpu(5) mem(5)
+#define CONTAINER_HDR_FMT "  %-23s %5s %5s"
+#define CONTAINER_ROW_FMT "#%06X *# %-23.23s %5.1f %5s\n"
 
 #endif

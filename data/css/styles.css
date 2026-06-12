@@ -425,6 +425,55 @@ h2 {
   cursor: pointer;
 }
 
+/* Settings cards: stacked number fields + clean toggle rows. */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.setting-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.setting-field label {
+  font-size: 0.8rem;
+  color: var(--secondary-color);
+}
+
+.setting-field .text-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.setting-toggle > label:first-child {
+  font-size: 0.875rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-toggle input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.setting-toggle .switch {
+  flex: 0 0 auto;
+}
+
 @media (max-width: 1400px) {
   .stats-container {
     grid-template-columns: repeat(2, 1fr);

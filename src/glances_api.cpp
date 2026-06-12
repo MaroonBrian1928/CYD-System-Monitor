@@ -169,13 +169,20 @@ void GlancesAPI::updateContainerData()
             color = 0xE0504F; // red: exited/dead/unhealthy/...
 
         snprintf(line, sizeof(line), CONTAINER_ROW_FMT,
-                 rows[i].name, (unsigned)color, rows[i].status, rows[i].cpu, mem);
+                 (unsigned)color, rows[i].name, rows[i].cpu, mem);
         out += line;
     }
     if (n == 0)
         out = "No containers";
 
     lv_label_set_text(container_label, out.c_str());
+
+    if (container_header)
+    {
+        char title[32];
+        snprintf(title, sizeof(title), LV_SYMBOL_LIST " Containers (%d)", n);
+        lv_label_set_text(container_header, title);
+    }
 }
 
 void updateGlancesData()

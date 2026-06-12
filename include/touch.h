@@ -33,4 +33,8 @@ void touch_init();
 // web UI. Holds the last touched sample (0..4095).
 void touch_get_last_raw(int16_t &x, int16_t &y);
 
+// Turn the screen off after this many seconds of no touch (0 = never). A touch
+// wakes it (and that wake tap is swallowed, not treated as a page change).
+void touch_set_backlight_timeout(uint32_t seconds);
+
 #endif

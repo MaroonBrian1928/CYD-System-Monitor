@@ -106,6 +106,7 @@ fetch('/settings')
     updateServerDisplay()
     populateTouchCalibration(data)
     populateAutoRotate(data)
+    populateBacklightTimeout(data)
   })
 
 const tempGauge = new Gauge(document.getElementById('tempGauge')).setOptions({
@@ -498,6 +499,33 @@ function saveAutoRotate() {
     .catch((error) => {
       console.error('Error:', error)
       alert('Failed to save auto-cycle settings')
+    })
+}
+
+// --- Screen timeout ---
+let backlightInitialized = false
+
+function populateBacklightTimeout(data) {
+  if (backlightInitialized || data.backlight_timeout === undefined) return
+  document.getElementById('backlightTimeout').value = data.backlight_timeout
+  backlightInitialized = true
+}
+
+function saveBacklightTimeout() {
+  let secs = parseInt(document.getElementById('backlightTimeout').value)
+  if (isNaN(secs) || secs < 0) secs = 0
+  fetch('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ backlight_timeout: secs })
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.status === 'success') alert('Screen timeout saved!')
+    })
+    .catch((error) => {
+      console.error('Error:', error)
+      alert('Failed to save screen timeout')
     })
 }
 
