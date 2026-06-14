@@ -67,6 +67,14 @@ static void map_touch(const TS_Point &p, int16_t &x, int16_t &y)
     if (c.invertY)
         my = SCREEN_H - my;
 
+    // When the display is flipped 180, the same physical touch maps to the
+    // opposite screen coordinate, so flip both axes to match.
+    if (SettingsManager::getDisplayFlip())
+    {
+        mx = SCREEN_W - mx;
+        my = SCREEN_H - my;
+    }
+
     x = clamp((int16_t)mx, 0, SCREEN_W - 1);
     y = clamp((int16_t)my, 0, SCREEN_H - 1);
 }

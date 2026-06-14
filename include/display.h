@@ -13,4 +13,8 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 void init_display();
 void display_sleep(bool sleep);
 
+// Flip the display 180 degrees (rotation 3 = normal, rotation 1 = flipped) and
+// redraw. Touch coordinates are flipped to match in the touch driver.
+void display_set_flip(bool flipped);
+
 #endif

@@ -194,6 +194,7 @@ void handleGetSettings()
     doc["auto_rotate"] = SettingsManager::getAutoRotate();
     doc["auto_rotate_interval"] = SettingsManager::getAutoRotateInterval();
     doc["backlight_timeout"] = SettingsManager::getBacklightTimeout();
+    doc["display_flip"] = SettingsManager::getDisplayFlip();
 
     String response;
     serializeJson(doc, response);
@@ -288,6 +289,12 @@ void handleUpdateSettings()
             uint16_t secs = doc["backlight_timeout"].as<uint16_t>();
             SettingsManager::setBacklightTimeout(secs);
             touch_set_backlight_timeout(secs);
+        }
+        if (doc.containsKey("display_flip"))
+        {
+            bool flipped = doc["display_flip"].as<bool>();
+            SettingsManager::setDisplayFlip(flipped);
+            display_set_flip(flipped);
         }
         server.send(200, "application/json", "{\"status\":\"success\"}");
     }

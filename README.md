@@ -35,6 +35,8 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
   - **Screen timeout** — optionally turn the screen off after a configurable
     period of no touch (saves power / reduces burn-in); tap to wake (the wake tap
     does not change the page). Configured from the web UI (0 = never).
+  - **Flip display 180°** — for upside-down mounting; toggled from the web UI,
+    applies instantly (display + touch), and persists across reboots.
 
 - Web interface for configuration:
   - Real-time theme customization
@@ -122,6 +124,43 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
   pio run -t upload      # firmware
   pio run -t uploadfs    # web UI (one-time, after the partition change)
   ```
+
+- **Flashing without sudo.** The serial ports (`/dev/ttyUSB*`) are owned by the `dialout` group, so add yourself to it once and re-login:
+
+  ```bash
+  sudo usermod -aG dialout "$USER"   # then log out/in
+  ```
+
+  Then use the helper script (no sudo, builds + uploads firmware and web UI):
+
+  ```bash
+  scripts/flash.sh          # firmware + web UI
+  scripts/flash.sh fw       # firmware only
+  scripts/flash.sh fs       # web UI only
+  scripts/flash.sh monitor  # serial monitor
+  ```
+
+  **Find your serial port first** — the device shows up as `/dev/ttyUSB*` (or
+  `/dev/ttyACM*`) and the number depends on your machine and what else is plugged
+  in, so it will likely differ from the script's default:
+
+  ```bash
+  ls /dev/ttyUSB* /dev/ttyACM*   # or: pio device list
+  ```
+
+  The script defaults to `/dev/ttyUSB1`. Use **your** port either by passing it
+  per-run via the `PORT` variable (no edit needed):
+
+  ```bash
+  PORT=/dev/ttyUSB0 scripts/flash.sh
+  PORT=/dev/ttyUSB0 scripts/flash.sh monitor
+  ```
+
+  ...or by changing the `PORT="${PORT:-/dev/ttyUSB1}"` default at the top of
+  `scripts/flash.sh` to your port.
+
+  (Running `pio` under `sudo` is what creates root-owned build files that then
+  need to be `chown` back — joining `dialout` avoids sudo entirely.)
 
 ### Touchscreen calibration
 

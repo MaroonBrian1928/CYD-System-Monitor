@@ -72,6 +72,7 @@ void setup()
     gui_set_auto_rotate(SettingsManager::getAutoRotate(),
                         SettingsManager::getAutoRotateInterval());
     touch_set_backlight_timeout(SettingsManager::getBacklightTimeout());
+    display_set_flip(SettingsManager::getDisplayFlip());
     if (!SPIFFS.begin(true))
     {
         Serial.println("SPIFFS Mount Failed");

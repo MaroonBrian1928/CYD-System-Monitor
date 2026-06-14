@@ -107,6 +107,7 @@ fetch('/settings')
     populateTouchCalibration(data)
     populateAutoRotate(data)
     populateBacklightTimeout(data)
+    populateDisplayFlip(data)
   })
 
 const tempGauge = new Gauge(document.getElementById('tempGauge')).setOptions({
@@ -527,6 +528,27 @@ function saveBacklightTimeout() {
       console.error('Error:', error)
       alert('Failed to save screen timeout')
     })
+}
+
+// --- Display orientation ---
+let displayFlipInitialized = false
+
+function populateDisplayFlip(data) {
+  if (displayFlipInitialized || data.display_flip === undefined) return
+  document.getElementById('displayFlip').checked = data.display_flip
+  displayFlipInitialized = true
+}
+
+function toggleDisplayFlip() {
+  const flipped = document.getElementById('displayFlip').checked
+  fetch('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display_flip: flipped })
+  }).catch((error) => {
+    console.error('Error:', error)
+    alert('Failed to flip display')
+  })
 }
 
 let displayOn = true

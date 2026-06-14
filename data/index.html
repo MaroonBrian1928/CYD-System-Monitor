@@ -480,6 +480,26 @@
               </button>
             </div>
           </div>
+          <div class="card display-card">
+            <h2><i class="ri-contrast-2-line"></i> Display Orientation</h2>
+            <div class="theme-controls">
+              <p class="theme-warning">
+                <i class="ri-information-line"></i> Rotate the screen 180&deg;
+                for upside-down mounting. Applies instantly and is remembered
+                across reboots.
+              </p>
+              <div class="setting-toggle">
+                <label for="displayFlip">Flip display 180&deg;</label>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    id="displayFlip"
+                    onchange="toggleDisplayFlip()" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
           <div class="card flash-card">
             <h2><i class="ri-sd-card-line"></i> Flash</h2>
             <div class="info-grid">

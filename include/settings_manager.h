@@ -76,6 +76,10 @@ public:
     static uint16_t getBacklightTimeout();
     static void setBacklightTimeout(uint16_t seconds);
 
+    // Flip the display (and touch) 180 degrees.
+    static bool getDisplayFlip();
+    static void setDisplayFlip(bool flipped);
+
     static ThemeCallback themeCallback;
 
 private:
@@ -88,4 +92,5 @@ private:
     static bool autoRotate;
     static uint16_t autoRotateInterval;
     static uint16_t backlightTimeout;
+    static bool displayFlip;
 };

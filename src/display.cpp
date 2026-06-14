@@ -38,6 +38,15 @@ void init_display()
     lv_disp_drv_register(&disp_drv);
 }
 
+void display_set_flip(bool flipped)
+{
+    // Rotation 3 is the normal landscape orientation; rotation 1 is 180 from it.
+    tft.setRotation(flipped ? 1 : 3);
+    lv_obj_t *scr = lv_scr_act();
+    if (scr)
+        lv_obj_invalidate(scr); // force a full redraw in the new orientation
+}
+
 void display_sleep(bool sleep)
 {
     if (sleep)
