@@ -3,6 +3,7 @@
 
 #include <lvgl.h>
 #include "config.h"
+#include "beszel_api.h"
 
 struct ArcWithLabel
 {
@@ -20,23 +21,18 @@ void create_system_monitor_gui();
 
 void set_arc_value_animated(lv_obj_t *arc, int32_t value, uint32_t duration = 500);
 
-extern lv_obj_t *cpu_label;
-extern lv_obj_t *ram_label;
-extern lv_obj_t *disk_label;
-extern lv_obj_t *uptime_label;
-extern lv_obj_t *network_label;
-extern lv_obj_t *cores_label;
-extern lv_obj_t *total_ram_label;
-extern lv_obj_t *temp_label;
-extern lv_obj_t *gpu_label;
-extern lv_obj_t *vram_label;
+// Built lazily once the first systems list arrives: one dashboard page per
+// monitored system, followed by a single combined container page. Safe to call
+// again when the set of systems changes -- it rebuilds from scratch.
+void gui_build_system_pages(const BeszelSystem *systems, int count);
 
-extern ArcWithLabel cpu_arc_obj;
-extern ArcWithLabel ram_arc_obj;
+// Refresh the live values (arcs + metric labels) on system `idx`'s dashboard.
+void gui_update_dashboard(int idx, const BeszelSystem &sys);
 
-// Page 2 (container list). The multi-line label is filled by glances_api.cpp;
-// gui_container_page_active() lets the data layer skip the fetch when hidden.
-// container_header is the title label, updated with the live container count.
+// Combined container page (last page). The multi-line label is filled by
+// beszel_api.cpp; gui_container_page_active() lets the data layer skip the
+// (large) container fetch while the page is hidden. container_header is the title
+// label, updated with the live container count.
 extern lv_obj_t *container_label;
 extern lv_obj_t *container_header;
 bool gui_container_page_active();

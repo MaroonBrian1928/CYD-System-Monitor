@@ -1,34 +1,35 @@
 # CYD System Monitor (ESP32 "Cheap Yellow Display")
 
-A sleek system monitoring display powered by ESP32 that shows real-time system metrics from a Glances server. Features a customizable UI with dark/light theme support using LVGL graphics library, a **touchscreen interface**, and power-saving display controls.
+A sleek system monitoring display powered by ESP32 that shows real-time system metrics from a [Beszel](https://beszel.dev) hub. Features a customizable UI with dark/light theme support using LVGL graphics library, a **touchscreen interface**, and power-saving display controls.
 
 ![Unraid](Images/device.jpeg)
 
 > **Note — this fork.** This build targets the **dual-USB Cheap Yellow Display
-> (ESP32-2432S028, CH340, ST7789 panel)** and pulls from the **Glances v4 API**.
-> Relative to upstream it adds **GPU/VRAM monitoring**, a **touchscreen UI**
-> (tap-to-switch paging and a Docker container page), a fix for
-> the panel's color inversion, and a larger flash partition. The `platformio.ini`
-> here is **self-contained** — TFT_eSPI is configured entirely via build flags, so
-> you do not need an external Arduino libraries folder.
+> (ESP32-2432S028, CH340, ST7789 panel)** and pulls from a **Beszel hub
+> (PocketBase API)**. It monitors **all systems** registered in the hub — one
+> swipeable dashboard page per system, plus a combined Docker container page —
+> a fix for the panel's color inversion, and a larger flash partition. The
+> `platformio.ini` here is **self-contained** — TFT_eSPI is configured entirely
+> via build flags, so you do not need an external Arduino libraries folder.
 
 ## Features
 
-- Real-time monitoring of:
+- Real-time monitoring of every Beszel-registered system:
   - CPU usage with core count
-  - RAM utilization with total capacity
+  - RAM utilization (%)
   - Disk usage percentage
-  - GPU utilization (NVIDIA, via the Glances `gpu` plugin)
-  - VRAM utilization
-  - System temperature with color-coded warnings
-  - Network traffic (upload/download) with auto-scaling units (B/KB/MB)
+  - GPU utilization (%, when the agent reports it)
+  - System temperature with color-coded warnings (when reported)
+  - Network throughput with auto-scaling units (B/KB/MB)
+  - 1-minute load average
   - Uptime
 
 - Touchscreen interface (XPT2046):
   - **Tap the screen** to switch pages (page-dot indicator at the bottom)
-  - **Page 1** — the metrics dashboard
-  - **Page 2** — a live **Docker container** table (name / status / CPU% / memory),
-    sorted by CPU, with color-coded status, scrollable for long lists
+  - **One dashboard page per system** — swipe through each monitored host
+  - **Container page** — a live combined **Docker container** table (name / CPU% /
+    memory), grouped by host and sorted by CPU, with color-coded status,
+    scrollable for long lists
   - **Auto-cycle pages** — optionally rotate through the UI pages on a
     configurable timer (this cycles between pages; it does not change the screen
     orientation). Toggle it and set the seconds-per-page from the web UI.
@@ -41,7 +42,7 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
 - Web interface for configuration:
   - Real-time theme customization
   - System statistics dashboard
-  - Glances server configuration
+  - Beszel server configuration
   - Device control and monitoring
   - Display power management
 
@@ -58,7 +59,8 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
 - TFT display compatible with TFT_eSPI library
   - I'm using this cheap yellow display with ESP32 built in: [aliexpress](https://s.click.aliexpress.com/e/_olrdG2w)
   - The settings in this project are for this display.
-- Glances server running on the target system
+- A Beszel hub reachable on the LAN (plain HTTP), with a user account whose
+  credentials the device can log in with
 
 ## Setup
 
@@ -87,24 +89,33 @@ A sleek system monitoring display powered by ESP32 that shows real-time system m
 
    ```
 
-4. Configure your network settings in credentials.example.h:
+4. Configure your settings in credentials.example.h:
 
    - Rename the file to `credentials.h`
-   - Edit the file to set your WiFi SSID and password
+   - Set your WiFi SSID and password, the Beszel hub address (LAN HTTP), and a
+     Beszel user account. The device logs in with these to obtain an auth token,
+     because Beszel's systems/containers collections are owner-scoped and return
+     no data otherwise.
 
    ```cpp
 
-    const char*const WIFI_SSID = "your_ssid_here";
+    const char* const WIFI_SSID = "your_ssid_here";
     const char* const WIFI_PASSWORD = "your_password_here";
+
+    const char* const BESZEL_HOST = "192.168.1.50";
+    const uint16_t BESZEL_PORT = 8090;
+    const char* const BESZEL_USERNAME = "you@example.com";
+    const char* const BESZEL_PASSWORD = "change_me";
 
    ```
 
 5. Build and upload the project using PlatformIO
 
-6. Set up your Glances server configuration in the web interface:
+6. Optional: adjust the Beszel server address in the web interface:
 
    - Access the web interface at the device's IP address
-   - Configure the Glances server IP address and port
+   - The host/port default to the values compiled in from `credentials.h`, but can
+     be overridden at runtime here (the login credentials stay compile-time only)
    - Choose theme colors if you want to change them
    - Save the configuration
 
@@ -229,7 +240,7 @@ You should see the entities show up in home assistant after a restart.
 - POST `/settings` - Update device settings:
   - Theme colors
   - Dark/light mode
-  - Glances server configuration
+  - Beszel server configuration
 
 - POST `/restart` - Restart device
 - POST `/resetTheme` - Reset theme to defaults

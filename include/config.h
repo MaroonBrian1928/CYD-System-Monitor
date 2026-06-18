@@ -7,9 +7,9 @@
 extern const char *const ssid;
 extern const char *const password;
 
-extern String glances_host;
-extern uint16_t glances_port;
-#define GLANCES_UPDATE_INTERVAL 2000
+extern String beszel_host;
+extern uint16_t beszel_port;
+#define BESZEL_UPDATE_INTERVAL 2000
 
 extern const uint16_t screenWidth;
 extern const uint16_t screenHeight;

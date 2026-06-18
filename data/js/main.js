@@ -101,8 +101,8 @@ fetch('/settings')
     memoryChart.options.scales.y.ticks.color = textColor
     cpuChart.update()
     memoryChart.update()
-    document.getElementById('glancesHost').value = data.glances_host
-    document.getElementById('glancesPort').value = data.glances_port
+    document.getElementById('beszelHost').value = data.beszel_host
+    document.getElementById('beszelPort').value = data.beszel_port
     updateServerDisplay()
     populateTouchCalibration(data)
     populateAutoRotate(data)
@@ -332,8 +332,8 @@ function toggleServerEdit() {
 }
 
 function updateServerDisplay() {
-  const host = document.getElementById('glancesHost').value
-  const port = document.getElementById('glancesPort').value
+  const host = document.getElementById('beszelHost').value
+  const port = document.getElementById('beszelPort').value
   const displayEl = document.getElementById('serverDisplay')
 
   if (host && port) {
@@ -360,8 +360,8 @@ setInterval(() => {
       updateTouchRaw(data)
 
       if (!isEditing) {
-        document.getElementById('glancesHost').value = data.glances_host
-        document.getElementById('glancesPort').value = data.glances_port
+        document.getElementById('beszelHost').value = data.beszel_host
+        document.getElementById('beszelPort').value = data.beszel_port
         updateServerDisplay()
       }
     })
@@ -372,9 +372,9 @@ setInterval(() => {
     })
 }, 2000)
 
-function saveGlancesSettings() {
-  const host = document.getElementById('glancesHost').value
-  const port = parseInt(document.getElementById('glancesPort').value)
+function saveBeszelSettings() {
+  const host = document.getElementById('beszelHost').value
+  const port = parseInt(document.getElementById('beszelPort').value)
 
   if (!host || !port) {
     alert('Please enter both host and port')
@@ -387,8 +387,8 @@ function saveGlancesSettings() {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      glances_host: host,
-      glances_port: port
+      beszel_host: host,
+      beszel_port: port
     })
   })
     .then((response) => response.json())
@@ -396,12 +396,12 @@ function saveGlancesSettings() {
       if (data.status === 'success') {
         updateServerDisplay()
         toggleServerEdit()
-        alert('Glances settings updated successfully!')
+        alert('Beszel settings updated successfully!')
       }
     })
     .catch((error) => {
       console.error('Error:', error)
-      alert('Failed to update Glances settings')
+      alert('Failed to update Beszel settings')
     })
 }
 
