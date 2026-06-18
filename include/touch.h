@@ -21,7 +21,16 @@
 
 // Set to 1 to also print raw + mapped coordinates to Serial on every touch.
 // Leave at 0 for normal use (the web UI shows the live raw values instead).
+// Configurable in credentials.h (alongside the other local build settings); the
+// default below keeps things building when it isn't defined there.
+#if defined(__has_include)
+#  if __has_include("credentials.h")
+#    include "credentials.h"
+#  endif
+#endif
+#ifndef TOUCH_DEBUG
 #define TOUCH_DEBUG 0
+#endif
 
 #include <cstdint>
 

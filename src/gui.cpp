@@ -263,7 +263,7 @@ void applyTheme(bool darkMode)
         theme_arc(d.cpu_arc, theme.cpu_color, theme);
         theme_arc(d.ram_arc, theme.ram_color, theme);
         if (d.name_label)
-            lv_obj_set_style_text_color(d.name_label, theme.text_color, 0);
+            lv_obj_set_style_text_color(d.name_label, theme.cpu_color, 0);
         theme_compact(d.temp_label, theme);
         theme_compact(d.gpu_label, theme);
         theme_compact(d.uptime_label, theme);
@@ -359,18 +359,21 @@ static void build_dashboard_page(lv_obj_t *parent, const ThemeColors *theme,
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_all(parent, 0, 0);
 
-    // Host name header.
+    // Host name header, styled like the Containers page title.
     lv_obj_t *header = lv_label_create(parent);
     lv_label_set_text(header, name);
-    lv_obj_set_style_text_font(header, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(header, theme->text_color, 0);
-    lv_obj_set_style_pad_top(header, 2, 0);
+    lv_obj_set_style_text_font(header, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(header, theme->cpu_color, 0);
+    lv_obj_set_style_pad_top(header, 8, 0);
     d.name_label = header;
 
     // Body: two columns of arc + metric cards.
+    // Fills whatever height the header leaves, so a taller header never clips
+    // the bottom cards.
     lv_obj_t *body = lv_obj_create(parent);
     lv_obj_remove_style_all(body);
-    lv_obj_set_size(body, 320, 218);
+    lv_obj_set_width(body, 320);
+    lv_obj_set_flex_grow(body, 1);
     lv_obj_set_flex_flow(body, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(body, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLLABLE);
@@ -379,7 +382,8 @@ static void build_dashboard_page(lv_obj_t *parent, const ThemeColors *theme,
     lv_obj_t *right_col = lv_obj_create(body);
     for (lv_obj_t *col : {left_col, right_col})
     {
-        lv_obj_set_size(col, 158, 218);
+        lv_obj_set_width(col, 158);
+        lv_obj_set_height(col, lv_pct(100));
         lv_obj_set_style_pad_all(col, 2, 0);
         lv_obj_set_style_bg_opa(col, LV_OPA_0, 0);
         lv_obj_set_style_border_width(col, 0, 0);
@@ -444,7 +448,7 @@ static void build_dots(const ThemeColors *theme)
     dots_cont = lv_obj_create(lv_scr_act());
     lv_obj_remove_style_all(dots_cont);
     lv_obj_set_size(dots_cont, page_count * 16, 12);
-    lv_obj_align(dots_cont, LV_ALIGN_BOTTOM_MID, 0, -6);
+    lv_obj_align(dots_cont, LV_ALIGN_TOP_RIGHT, -6, 6);
     lv_obj_set_flex_flow(dots_cont, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(dots_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(dots_cont, 8, 0);
@@ -567,8 +571,10 @@ void gui_update_dashboard(int idx, const BeszelSystem &sys)
     if (d.name_label)
     {
         lv_label_set_text(d.name_label, sys.name);
-        lv_obj_set_style_text_color(d.name_label,
-                                    sys.up ? lv_color_hex(0x33D17A) : lv_color_hex(0xE0504F), 0);
+        // Cyan like the Containers title when up; red flags a down host.
+        lv_obj_set_style_text_color(
+            d.name_label,
+            sys.up ? SettingsManager::getCurrentTheme().cpu_color : lv_color_hex(0xE0504F), 0);
     }
 
     // CPU arc: big % value, cores on the info line.
