@@ -1,5 +1,6 @@
 #include "settings_manager.h"
 #include "config.h"
+#include "credentials.h"
 #include <lvgl.h>
 #include <string.h>
 
@@ -10,8 +11,8 @@ SettingsManager::ThemeCallback SettingsManager::themeCallback = nullptr;
 static ThemeColors mutable_dark_theme = dark_theme;
 static ThemeColors mutable_light_theme = light_theme;
 
-String SettingsManager::glancesHost;
-uint16_t SettingsManager::glancesPort;
+String SettingsManager::beszelHost;
+uint16_t SettingsManager::beszelPort;
 
 TouchCalibration SettingsManager::touchCal = {
     TOUCH_CAL_DEFAULT_X_MIN, TOUCH_CAL_DEFAULT_X_MAX,
@@ -28,11 +29,11 @@ void SettingsManager::begin()
     preferences.begin("settings", false);
     darkMode = preferences.getBool("darkMode", true);
 
-    glancesHost = preferences.getString("glances_host", "192.168.1.50");
-    glancesPort = preferences.getUInt("glances_port", 61208);
+    beszelHost = preferences.getString("beszel_host", BESZEL_HOST);
+    beszelPort = preferences.getUInt("beszel_port", BESZEL_PORT);
 
-    glances_host = glancesHost;
-    glances_port = glancesPort;
+    beszel_host = beszelHost;
+    beszel_port = beszelPort;
 
     touchCal.rawXMin = preferences.getUShort("tch_xmin", TOUCH_CAL_DEFAULT_X_MIN);
     touchCal.rawXMax = preferences.getUShort("tch_xmax", TOUCH_CAL_DEFAULT_X_MAX);
@@ -162,28 +163,28 @@ void SettingsManager::clearSavedColors()
     preferences.remove("border_color");
 }
 
-const String &SettingsManager::getGlancesHost()
+const String &SettingsManager::getBeszelHost()
 {
-    return glancesHost;
+    return beszelHost;
 }
 
-uint16_t SettingsManager::getGlancesPort()
+uint16_t SettingsManager::getBeszelPort()
 {
-    return glancesPort;
+    return beszelPort;
 }
 
-void SettingsManager::setGlancesHost(const String &host)
+void SettingsManager::setBeszelHost(const String &host)
 {
-    glancesHost = host;
-    preferences.putString("glances_host", host);
-    glances_host = host;
+    beszelHost = host;
+    preferences.putString("beszel_host", host);
+    beszel_host = host;
 }
 
-void SettingsManager::setGlancesPort(uint16_t port)
+void SettingsManager::setBeszelPort(uint16_t port)
 {
-    glancesPort = port;
-    preferences.putUInt("glances_port", port);
-    glances_port = port;
+    beszelPort = port;
+    preferences.putUInt("beszel_port", port);
+    beszel_port = port;
 }
 
 const TouchCalibration &SettingsManager::getTouchCalibration()

@@ -6,9 +6,9 @@
 const uint16_t screenWidth = 240;
 const uint16_t screenHeight = 320;
 
-// Glances settings
-String glances_host;
-uint16_t glances_port;
+// Beszel settings
+String beszel_host;
+uint16_t beszel_port;
 
 // Theme definitions
 const ThemeColors light_theme = {

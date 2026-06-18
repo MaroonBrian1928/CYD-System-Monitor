@@ -58,10 +58,10 @@ public:
         themeCallback = callback;
     }
     static void clearSavedColors();
-    static const String& getGlancesHost();
-    static uint16_t getGlancesPort();
-    static void setGlancesHost(const String& host);
-    static void setGlancesPort(uint16_t port);
+    static const String& getBeszelHost();
+    static uint16_t getBeszelPort();
+    static void setBeszelHost(const String& host);
+    static void setBeszelPort(uint16_t port);
 
     static const TouchCalibration& getTouchCalibration();
     static void setTouchCalibration(const TouchCalibration& cal);
@@ -86,8 +86,8 @@ private:
     static Preferences preferences;
     static bool darkMode;
     static void loadSettings();
-    static String glancesHost;
-    static uint16_t glancesPort;
+    static String beszelHost;
+    static uint16_t beszelPort;
     static TouchCalibration touchCal;
     static bool autoRotate;
     static uint16_t autoRotateInterval;

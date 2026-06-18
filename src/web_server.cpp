@@ -174,8 +174,8 @@ void handleGetSettings()
             (uint8_t)(color & 0xFF));
     doc["cardBgColor"] = hexColor;
     doc["darkMode"] = SettingsManager::getDarkMode();
-    doc["glances_host"] = SettingsManager::getGlancesHost();
-    doc["glances_port"] = SettingsManager::getGlancesPort();
+    doc["beszel_host"] = SettingsManager::getBeszelHost();
+    doc["beszel_port"] = SettingsManager::getBeszelPort();
 
     const TouchCalibration &tc = SettingsManager::getTouchCalibration();
     doc["touch_x_min"] = tc.rawXMin;
@@ -239,13 +239,13 @@ void handleUpdateSettings()
         {
             SettingsManager::updateThemeColor("card_bg_color", doc["card_bg_color"].as<uint32_t>());
         }
-        if (doc.containsKey("glances_host"))
+        if (doc.containsKey("beszel_host"))
         {
-            SettingsManager::setGlancesHost(doc["glances_host"].as<String>());
+            SettingsManager::setBeszelHost(doc["beszel_host"].as<String>());
         }
-        if (doc.containsKey("glances_port"))
+        if (doc.containsKey("beszel_port"))
         {
-            SettingsManager::setGlancesPort(doc["glances_port"].as<uint16_t>());
+            SettingsManager::setBeszelPort(doc["beszel_port"].as<uint16_t>());
         }
         if (doc.containsKey("reset_touch") && doc["reset_touch"].as<bool>())
         {

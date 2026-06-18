@@ -5,7 +5,7 @@
 #include "display.h"
 #include "gui.h"
 #include "touch.h"
-#include "glances_api.h"
+#include "beszel_api.h"
 #include "settings_manager.h"
 #include "web_server.h"
 #include "credentials.h"
@@ -89,7 +89,7 @@ void setup()
 void loop()
 {
     lv_timer_handler();
-    updateGlancesData();
+    updateBeszelData();
     handleWebServer();
     delay(1);
 }
