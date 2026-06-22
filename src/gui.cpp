@@ -297,6 +297,73 @@ bool gui_container_page_active()
     return page_count > 0 && current_page == page_count - 1;
 }
 
+void gui_container_scroll_by(int16_t dy)
+{
+    if (!container_label)
+        return;
+    lv_obj_t *view = lv_obj_get_parent(container_label);
+    if (!view)
+        return;
+    // Clamp to the available scroll room so the list can't be dragged past its
+    // ends. Positive dy moves content down (reveals the top); negative reveals
+    // the bottom.
+    if (dy > 0)
+    {
+        lv_coord_t room = lv_obj_get_scroll_top(view);
+        if (dy > room)
+            dy = room;
+    }
+    else if (dy < 0)
+    {
+        lv_coord_t room = lv_obj_get_scroll_bottom(view);
+        if (-dy > room)
+            dy = -room;
+    }
+    if (dy)
+        lv_obj_scroll_by(view, 0, dy, LV_ANIM_OFF);
+}
+
+// ---- Inertial (momentum) scrolling for the container list -----------------
+static lv_timer_t *fling_timer = NULL;
+static float fling_vel = 0.0f; // px per tick, decays each tick
+
+static void fling_timer_cb(lv_timer_t *t)
+{
+    if (!gui_container_page_active())
+    {
+        fling_vel = 0.0f;
+        lv_timer_pause(t);
+        return;
+    }
+    fling_vel *= 0.82f; // friction
+    int16_t dy = (int16_t)fling_vel;
+    if (dy == 0)
+    {
+        fling_vel = 0.0f;
+        lv_timer_pause(t);
+        return;
+    }
+    gui_container_scroll_by(dy);
+}
+
+void gui_container_fling(int16_t velocity)
+{
+    fling_vel = (float)velocity;
+    if (fling_vel > -1.0f && fling_vel < 1.0f)
+        return; // too slow to bother coasting
+    if (!fling_timer)
+        fling_timer = lv_timer_create(fling_timer_cb, 20, NULL);
+    lv_timer_reset(fling_timer);
+    lv_timer_resume(fling_timer);
+}
+
+void gui_container_fling_stop()
+{
+    fling_vel = 0.0f;
+    if (fling_timer)
+        lv_timer_pause(fling_timer);
+}
+
 static lv_timer_t *rotate_timer = NULL;
 
 void gui_next_page()
@@ -433,6 +500,9 @@ static void build_container_page(lv_obj_t *parent, const ThemeColors *theme)
     lv_obj_set_style_pad_all(view, 0, 0);
     lv_obj_set_scroll_dir(view, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(view, LV_SCROLLBAR_MODE_AUTO);
+    // We scroll this view ourselves from the touch deltas (gui_container_scroll_by),
+    // so disable LVGL's own pointer-scroll to avoid the two fighting.
+    lv_obj_clear_flag(view, LV_OBJ_FLAG_SCROLLABLE);
 
     container_label = lv_label_create(view);
     lv_label_set_long_mode(container_label, LV_LABEL_LONG_WRAP);

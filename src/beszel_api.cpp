@@ -361,7 +361,13 @@ static void updateContainerData()
     if (shown == 0)
         out = "No containers";
 
+    // Preserve the scroll position across the 2s text refresh so an in-progress
+    // scroll isn't yanked back to the top each update.
+    lv_obj_t *view = lv_obj_get_parent(container_label);
+    lv_coord_t saved_scroll = view ? lv_obj_get_scroll_y(view) : 0;
     lv_label_set_text(container_label, out.c_str());
+    if (view)
+        lv_obj_scroll_to_y(view, saved_scroll, LV_ANIM_OFF);
     if (container_header)
     {
         char title[40];

@@ -37,6 +37,15 @@ extern lv_obj_t *container_label;
 extern lv_obj_t *container_header;
 bool gui_container_page_active();
 
+// Scroll the container list by dy pixels (driven directly from touch deltas;
+// positive dy follows a downward finger). Bounded to the list's scroll range.
+void gui_container_scroll_by(int16_t dy);
+
+// Inertial scrolling for the container list: start a coast at the given velocity
+// (px per tick) on finger release, or stop it when a new touch begins.
+void gui_container_fling(int16_t velocity);
+void gui_container_fling_stop();
+
 // Called by the touch driver on each tap to advance to the next page (wraps).
 void gui_next_page();
 

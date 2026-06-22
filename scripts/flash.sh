@@ -6,24 +6,38 @@
 #     sudo usermod -aG dialout "$USER"
 #     # then log out and back in (or reboot) for the group to take effect
 #
-# Find your serial port first (it depends on your machine / what else is plugged
-# in, so it will likely NOT be the default below):
-#     ls /dev/ttyUSB* /dev/ttyACM*     # or: pio device list
+# Port selection: by default the script auto-detects the CYD by its USB-serial
+# bridge (WCH CH340/CH341, USB vendor 1a86) and asks you to confirm before
+# flashing -- it prints the device's model and kernel driver so you don't write
+# firmware to the wrong dongle. Override with PORT=/dev/ttyXXX if needed.
 #
 # Usage:
 #     scripts/flash.sh           # firmware + filesystem (web UI)
 #     scripts/flash.sh fw        # firmware only
 #     scripts/flash.sh fs        # filesystem (web UI) only
 #     scripts/flash.sh monitor   # open the serial monitor
-#     PORT=/dev/ttyUSB0 scripts/flash.sh        # use a specific port
+#     PORT=/dev/ttyUSB0 scripts/flash.sh        # force a specific port
+#     scripts/flash.sh -y        # skip the confirmation prompt
 #
 set -euo pipefail
 
-# Default port -- override per-run with `PORT=/dev/ttyXXX scripts/flash.sh`, or
-# change this line to match your setup.
-PORT="${PORT:-/dev/ttyUSB1}"
 PIO="${PIO:-$HOME/.cyd-pio-venv/bin/pio}"
 export PLATFORMIO_CORE_DIR="${PLATFORMIO_CORE_DIR:-$HOME/.platformio}"
+
+# WCH CH340/CH341 USB vendor id -- the USB-serial bridge on the CYD.
+CYD_VENDOR_ID="1a86"
+ASSUME_YES="${ASSUME_YES:-0}"
+
+# Parse args: an optional -y/--yes anywhere, plus one target.
+target=""
+for arg in "$@"; do
+  case "$arg" in
+    -y | --yes) ASSUME_YES=1 ;;
+    fw | firmware | fs | spiffs | uploadfs | all | monitor) target="$arg" ;;
+    *) echo "Usage: $0 [-y] [fw|fs|all|monitor]" >&2; exit 1 ;;
+  esac
+done
+target="${target:-all}"
 
 cd "$(dirname "$0")/.."
 
@@ -32,19 +46,58 @@ if [ ! -x "$PIO" ]; then
   exit 1
 fi
 
-target="${1:-all}"
+# --- USB metadata helpers (udevadm; degrade gracefully if absent) ----------
+port_prop() {  # port_prop <device> <PROPERTY>
+  udevadm info -q property -n "$1" 2>/dev/null | sed -n "s/^$2=//p"
+}
+port_model() { local m; m="$(port_prop "$1" ID_MODEL)"; echo "${m:-unknown}"; }
+port_driver() { local d; d="$(port_prop "$1" ID_USB_DRIVER)"; echo "${d:-unknown}"; }
 
-# The monitor and uploads all need read/write access to the serial port.
+list_ports() { ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true; }
+
+print_port_line() {  # "    /dev/ttyUSB0  (model, driver)"
+  printf '    %s  (%s, %s)\n' "$1" "$(port_model "$1")" "$(port_driver "$1")"
+}
+
+# --- Choose the port -------------------------------------------------------
+if [ -n "${PORT:-}" ]; then
+  : # explicit override, use as-is
+else
+  matches=()
+  for p in $(list_ports); do
+    [ "$(port_prop "$p" ID_VENDOR_ID)" = "$CYD_VENDOR_ID" ] && matches+=("$p")
+  done
+
+  if [ "${#matches[@]}" -eq 1 ]; then
+    PORT="${matches[0]}"
+  elif [ "${#matches[@]}" -gt 1 ]; then
+    echo "Multiple CH340/CH341 devices found -- pick one with PORT=...:" >&2
+    for p in "${matches[@]}"; do print_port_line "$p" >&2; done
+    exit 1
+  else
+    echo "Error: no CYD (CH340/CH341, USB vendor $CYD_VENDOR_ID) serial port found." >&2
+    echo "Available serial ports:" >&2
+    found="$(list_ports)"
+    if [ -n "$found" ]; then
+      for p in $found; do print_port_line "$p" >&2; done
+    else
+      echo "    (none found)" >&2
+    fi
+    echo "Plug in the CYD, or force one with: PORT=/dev/ttyXXX $0" >&2
+    exit 1
+  fi
+fi
+
+# --- Validate the chosen port ----------------------------------------------
 if [ ! -e "$PORT" ]; then
   echo "Error: serial port $PORT not found. Is the device plugged in?" >&2
   echo "Available serial ports:" >&2
-  ports=$(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true)
-  if [ -n "$ports" ]; then
-    echo "$ports" | sed 's/^/    /' >&2
+  found="$(list_ports)"
+  if [ -n "$found" ]; then
+    for p in $found; do print_port_line "$p" >&2; done
   else
     echo "    (none found)" >&2
   fi
-  echo "Pick yours and pass it, e.g.: PORT=/dev/ttyUSB0 $0" >&2
   exit 1
 fi
 if [ ! -w "$PORT" ]; then
@@ -52,6 +105,22 @@ if [ ! -w "$PORT" ]; then
   echo "Run once, then log out/in:" >&2
   echo "    sudo usermod -aG dialout $USER" >&2
   exit 1
+fi
+
+# --- Confirm before touching the device ------------------------------------
+echo "Target port: $PORT"
+echo "  Model:  $(port_model "$PORT")"
+echo "  Driver: $(port_driver "$PORT")"
+if [ "$ASSUME_YES" != "1" ]; then
+  if [ ! -t 0 ]; then
+    echo "Refusing to proceed without confirmation (no TTY). Re-run with -y to skip." >&2
+    exit 1
+  fi
+  read -r -p "Flash/monitor this device? [y/N] " ans
+  case "$ans" in
+    y | Y | yes | YES) ;;
+    *) echo "Aborted."; exit 1 ;;
+  esac
 fi
 
 case "$target" in
@@ -67,10 +136,6 @@ case "$target" in
     ;;
   monitor)
     exec "$PIO" device monitor -p "$PORT" -b 115200
-    ;;
-  *)
-    echo "Usage: $0 [fw|fs|all|monitor]" >&2
-    exit 1
     ;;
 esac
 
