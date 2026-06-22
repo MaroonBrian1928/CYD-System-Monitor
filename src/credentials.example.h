@@ -18,4 +18,8 @@ const uint16_t BESZEL_PORT = 8090;
 const char* const BESZEL_USERNAME = "you@example.com";
 const char* const BESZEL_PASSWORD = "change_me";
 
+// Set to 1 to print raw + mapped touch coordinates to Serial on every touch
+// (useful for calibration/diagnosing touch). Leave at 0 for normal use.
+#define TOUCH_DEBUG 0
+
 #endif
