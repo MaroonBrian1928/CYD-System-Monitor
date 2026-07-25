@@ -90,6 +90,7 @@ void loop()
 {
     lv_timer_handler();
     updateBeszelData();
+    refreshContainerData();
     handleWebServer();
     delay(1);
 }

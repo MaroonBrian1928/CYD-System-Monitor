@@ -654,7 +654,7 @@ void gui_update_dashboard(int idx, const BeszelSystem &sys)
         if (L)
         {
             lv_label_set_text(L[0], "CPU");
-            snprintf(buf, sizeof(buf), "%d%%", (int)sys.cpu);
+            snprintf(buf, sizeof(buf), "%.1f%%", sys.cpu);
             lv_label_set_text(L[1], buf);
             snprintf(buf, sizeof(buf), "%d cores", sys.cores);
             lv_label_set_text(L[2], buf);
@@ -669,7 +669,7 @@ void gui_update_dashboard(int idx, const BeszelSystem &sys)
         if (L)
         {
             lv_label_set_text(L[0], "RAM");
-            snprintf(buf, sizeof(buf), "%d%%", (int)sys.mem);
+            snprintf(buf, sizeof(buf), "%.1f%%", sys.mem);
             lv_label_set_text(L[1], buf);
             if (sys.hasMemTotal)
                 snprintf(buf, sizeof(buf), "/ %.1f GB", sys.memTotalGB);

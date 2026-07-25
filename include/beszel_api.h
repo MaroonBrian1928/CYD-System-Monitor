@@ -40,8 +40,11 @@ extern BeszelSystem beszel_systems[BESZEL_MAX_SYSTEMS];
 extern int beszel_system_count;
 
 // Throttled (BESZEL_UPDATE_INTERVAL) refresh: authenticates if needed, pulls the
-// systems list, (re)builds the per-system dashboard pages, and -- when the
-// combined container page is showing -- pulls the container list.
+// systems list, and (re)builds the per-system dashboard pages.
 void updateBeszelData();
+
+// Refresh the combined container page while it is visible.  This has its own
+// shorter cadence so opening the page does not wait for the next system poll.
+void refreshContainerData();
 
 #endif

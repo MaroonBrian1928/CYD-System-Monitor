@@ -209,8 +209,12 @@ static bool fetchSystems()
         "/api/collections/systems/records?perPage=" + String(BESZEL_MAX_SYSTEMS) +
         "&skipTotal=1&sort=%2Bname&fields=id,name,host,status,info";
 
-    if (beszelGet(endpoint, doc, nullptr) != HTTP_CODE_OK)
+    int result = beszelGet(endpoint, doc, nullptr);
+    if (result != HTTP_CODE_OK)
+    {
+        Serial.printf("Beszel systems refresh failed: %d\n", result);
         return false;
+    }
 
     beszel_system_count = 0;
     for (JsonObject it : doc["items"].as<JsonArray>())
@@ -376,6 +380,28 @@ static void updateContainerData()
     }
 }
 
+void refreshContainerData()
+{
+    static unsigned long lastUpdate = 0;
+    static bool hasUpdated = false;
+
+    // Reset the throttle while hidden. That makes the first refresh after
+    // entering the Containers page happen immediately instead of waiting for
+    // a previous page visit's timer to expire.
+    if (!gui_container_page_active() || !container_label)
+    {
+        hasUpdated = false;
+        return;
+    }
+
+    if (hasUpdated && millis() - lastUpdate < CONTAINER_UPDATE_INTERVAL)
+        return;
+
+    lastUpdate = millis();
+    hasUpdated = true;
+    updateContainerData();
+}
+
 void updateBeszelData()
 {
     static unsigned long lastUpdate = 0;
@@ -405,5 +431,4 @@ void updateBeszelData()
     for (int i = 0; i < beszel_system_count; i++)
         gui_update_dashboard(i, beszel_systems[i]);
 
-    updateContainerData();
 }
