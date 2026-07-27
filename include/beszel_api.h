@@ -46,5 +46,6 @@ void updateBeszelData();
 // Refresh the combined container page while it is visible.  This has its own
 // shorter cadence so opening the page does not wait for the next system poll.
 void refreshContainerData();
+void updateBeszelRealtime();
 
 #endif

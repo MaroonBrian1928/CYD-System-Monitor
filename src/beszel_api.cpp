@@ -12,6 +12,19 @@ int beszel_system_count = 0;
 // owner-scoped, so every request must carry this. Empty == not logged in;
 // cleared and re-fetched automatically on a 401.
 static String g_token;
+static WiFiClient g_realtime;
+static String g_realtime_line;
+static String g_realtime_event;
+static String g_realtime_client_id;
+static String g_realtime_chunk_line;
+static bool g_realtime_headers = false;
+static bool g_realtime_chunked = false;
+static bool g_realtime_subscribed = false;
+static int g_realtime_system_index = -2;
+static long g_realtime_chunk_remaining = -1;
+static uint8_t g_realtime_chunk_trailer = 0;
+static unsigned long g_realtime_attempt = 0;
+static unsigned long g_realtime_subscription_attempt = 0;
 
 // How many dashboard pages the GUI has currently built, so we only rebuild when
 // the set of monitored systems actually changes (rare).
@@ -21,12 +34,18 @@ static int g_built_count = -1;
 // the slower system_stats time-series. We pull those on a longer interval and
 // cache the distilled values by system id so the fast 2s info refresh can merge
 // them in without wiping them.
-#define BESZEL_STATS_INTERVAL 30000
+#define BESZEL_STATS_INTERVAL 1000
 struct StatsCache
 {
     char id[20];
+    float cpu;
+    float mem;
+    float disk;
+    float bw;
+    float load1;
     float memTotalGB;
     float vram;
+    bool hasLive;
     bool hasMemTotal;
     bool hasVram;
 };
@@ -125,10 +144,15 @@ static void fetchStats()
     static DynamicJsonDocument doc(8192);
     doc.clear();
 
-    StaticJsonDocument<160> filter;
+    StaticJsonDocument<256> filter;
     JsonObject item = filter["items"].createNestedObject();
     item["system"] = true;
     JsonObject stats = item.createNestedObject("stats");
+    stats["cpu"] = true;
+    stats["mp"] = true;
+    stats["dp"] = true;
+    stats["b"] = true;
+    stats["la"] = true;
     stats["m"] = true;
     stats["g"] = true;
 
@@ -157,6 +181,14 @@ static void fetchStats()
         StatsCache &c = g_stats[g_stats_count];
         strlcpy(c.id, sid, sizeof(c.id));
         JsonObject st = it["stats"];
+        c.hasLive = true;
+        c.cpu = st["cpu"] | 0.0f;
+        c.mem = st["mp"] | 0.0f;
+        c.disk = st["dp"] | 0.0f;
+        c.load1 = st["la"][0] | 0.0f;
+        c.bw = 0.0f;
+        for (JsonVariant rate : st["b"].as<JsonArray>())
+            c.bw += rate.as<float>(); // Beszel reports receive + transmit separately.
         c.hasMemTotal = st.containsKey("m");
         c.memTotalGB = st["m"] | 0.0f;
         c.hasVram = false;
@@ -191,6 +223,14 @@ static void mergeStats(BeszelSystem &s)
     {
         if (strcmp(g_stats[k].id, s.id) == 0)
         {
+            if (g_stats[k].hasLive)
+            {
+                s.cpu = g_stats[k].cpu;
+                s.mem = g_stats[k].mem;
+                s.disk = g_stats[k].disk;
+                s.bw = g_stats[k].bw;
+                s.load1 = g_stats[k].load1;
+            }
             s.hasMemTotal = g_stats[k].hasMemTotal;
             s.memTotalGB = g_stats[k].memTotalGB;
             s.hasVram = g_stats[k].hasVram;
@@ -243,6 +283,259 @@ static bool fetchSystems()
         beszel_system_count++;
     }
     return true;
+}
+
+static void applyRealtimeRecord(JsonObject record)
+{
+    const char *id = record["system"] | record["id"] | "";
+    for (int i = 0; i < beszel_system_count; i++)
+    {
+        if (strcmp(beszel_systems[i].id, id) != 0)
+            continue;
+        BeszelSystem &s = beszel_systems[i];
+        JsonObject info = record["info"];
+        JsonObject stats = record["stats"];
+        JsonObject data = !stats.isNull() ? stats : info;
+        if (data.isNull())
+            return;
+        s.cpu = data["cpu"] | s.cpu;
+        s.mem = data["mp"] | s.mem;
+        s.disk = data["dp"] | s.disk;
+        s.load1 = data["la"][0] | s.load1;
+        if (!stats.isNull())
+        {
+            float bw = 0;
+            for (JsonVariant rate : stats["b"].as<JsonArray>())
+                bw += rate.as<float>();
+            if (!stats["b"].isNull())
+                s.bw = bw;
+        }
+        else
+            s.bw = info["bb"] | s.bw;
+        gui_update_dashboard(i, s);
+        return;
+    }
+}
+
+static void applyRealtimeMetrics(const String &event, JsonObject data)
+{
+    const String marker = "%22system%22%3A%22";
+    int start = event.indexOf(marker);
+    if (start < 0)
+        return;
+    start += marker.length();
+    int end = event.indexOf("%22", start);
+    if (end < 0)
+        return;
+    String id = event.substring(start, end);
+    for (int i = 0; i < beszel_system_count; i++)
+    {
+        if (id != beszel_systems[i].id)
+            continue;
+        // A page may change while an event from the previous subscription is
+        // still buffered. Never apply that stale page's payload.
+        if (i != gui_active_system_index())
+            return;
+        BeszelSystem &s = beszel_systems[i];
+        JsonObject stats = data["stats"];
+        s.cpu = stats["cpu"] | s.cpu;
+        s.mem = stats["mp"] | s.mem;
+        s.disk = stats["dp"] | s.disk;
+        s.load1 = stats["la"][0] | s.load1;
+        float bw = 0;
+        for (JsonVariant rate : stats["b"].as<JsonArray>())
+            bw += rate.as<float>();
+        if (!stats["b"].isNull())
+            s.bw = bw;
+        gui_update_dashboard(i, s);
+        return;
+    }
+}
+
+static void subscribeRealtime(const String &clientId, int activeSystem)
+{
+    DynamicJsonDocument doc(2048);
+    doc["clientId"] = clientId;
+    JsonArray topics = doc.createNestedArray("subscriptions");
+    topics.add("systems/*?options={\"query\":{\"fields\":\"id,name,host,port,info,status\"}}");
+    if (activeSystem >= 0 && activeSystem < beszel_system_count)
+    {
+        String topic = "rt_metrics?options=%7B%22query%22%3A%7B%22system%22%3A%22";
+        topic += beszel_systems[activeSystem].id;
+        topic += "%22%7D%7D";
+        topics.add(topic);
+    }
+    String body;
+    serializeJson(doc, body);
+    HTTPClient http;
+    http.begin(beszelBaseUrl() + "/api/realtime");
+    http.addHeader("Authorization", g_token);
+    http.addHeader("Content-Type", "application/json");
+    g_realtime_subscription_attempt = millis();
+    g_realtime_subscribed = (http.POST(body) == HTTP_CODE_NO_CONTENT);
+    if (g_realtime_subscribed)
+    {
+        g_realtime_system_index = activeSystem;
+        if (activeSystem >= 0)
+            Serial.printf("Beszel realtime active: %s (%s)\n",
+                          beszel_systems[activeSystem].name,
+                          beszel_systems[activeSystem].id);
+        else
+            Serial.println("Beszel realtime active: containers (metrics paused)");
+    }
+    else
+        Serial.println("Beszel realtime subscription: failed");
+    http.end();
+}
+
+static void processRealtimeSseLine()
+{
+    g_realtime_line.trim();
+    if (g_realtime_line.startsWith("event:"))
+    {
+        g_realtime_event = g_realtime_line.substring(6);
+        g_realtime_event.trim();
+    }
+    else if (g_realtime_line.startsWith("data:"))
+    {
+        DynamicJsonDocument doc(4096);
+        String payload = g_realtime_line.substring(5);
+        payload.trim();
+        StaticJsonDocument<256> filter;
+        if (g_realtime_event == "PB_CONNECT")
+            filter["clientId"] = true;
+        else if (g_realtime_event.startsWith("rt_metrics"))
+        {
+            JsonObject stats = filter.createNestedObject("stats");
+            stats["cpu"] = true;
+            stats["mp"] = true;
+            stats["dp"] = true;
+            stats["la"] = true;
+            stats["b"] = true;
+        }
+        else
+            filter["record"] = true;
+        DeserializationError error = deserializeJson(
+            doc, payload, DeserializationOption::Filter(filter));
+        if (!error)
+        {
+            if (g_realtime_event == "PB_CONNECT")
+            {
+                Serial.println("Beszel realtime handshake received");
+                g_realtime_client_id = doc["clientId"].as<String>();
+                subscribeRealtime(g_realtime_client_id, gui_active_system_index());
+            }
+            else if (g_realtime_event.startsWith("rt_metrics"))
+                applyRealtimeMetrics(g_realtime_event, doc.as<JsonObject>());
+            else
+                applyRealtimeRecord(doc["record"].as<JsonObject>());
+        }
+        else
+            Serial.printf("Beszel realtime JSON error: %s (%u bytes)\n",
+                          error.c_str(), payload.length());
+    }
+    g_realtime_line = "";
+}
+
+static void processRealtimeSseChar(char ch)
+{
+    if (ch == '\n')
+        processRealtimeSseLine();
+    else
+        g_realtime_line += ch;
+}
+
+void updateBeszelRealtime()
+{
+    if (WiFi.status() != WL_CONNECTED)
+        return;
+    if (!g_realtime.connected())
+    {
+        if (millis() - g_realtime_attempt < 5000)
+            return;
+        g_realtime_attempt = millis();
+        g_realtime.stop();
+        g_realtime_headers = false;
+        g_realtime_chunked = false;
+        g_realtime_subscribed = false;
+        g_realtime_client_id = "";
+        g_realtime_system_index = -2;
+        g_realtime_chunk_remaining = -1;
+        g_realtime_chunk_trailer = 0;
+        g_realtime_chunk_line = "";
+        g_realtime_line = "";
+        g_realtime_line.reserve(8192);
+        if (g_token.isEmpty() && !beszelLogin())
+            return;
+        if (!g_realtime.connect(beszel_host.c_str(), beszel_port))
+        {
+            Serial.println("Beszel realtime socket: failed");
+            return;
+        }
+        Serial.println("Beszel realtime socket: open");
+        g_realtime.print("GET /api/realtime HTTP/1.1\r\nHost: " + beszel_host + "\r\nAuthorization: " + g_token + "\r\nAccept: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n");
+    }
+    for (int n = 0; n < 192 && g_realtime.available(); n++)
+    {
+        char ch = (char)g_realtime.read();
+        if (!g_realtime_headers)
+        {
+            if (ch != '\n')
+            {
+                g_realtime_line += ch;
+                continue;
+            }
+            g_realtime_line.trim();
+            if (g_realtime_line.equalsIgnoreCase("Transfer-Encoding: chunked"))
+                g_realtime_chunked = true;
+            if (g_realtime_line.isEmpty())
+                g_realtime_headers = true;
+            g_realtime_line = "";
+            continue;
+        }
+
+        if (!g_realtime_chunked)
+        {
+            processRealtimeSseChar(ch);
+            continue;
+        }
+
+        if (g_realtime_chunk_trailer > 0)
+        {
+            g_realtime_chunk_trailer--;
+            if (g_realtime_chunk_trailer == 0)
+                g_realtime_chunk_remaining = -1;
+            continue;
+        }
+        if (g_realtime_chunk_remaining < 0)
+        {
+            if (ch != '\n')
+            {
+                g_realtime_chunk_line += ch;
+                continue;
+            }
+            g_realtime_chunk_line.trim();
+            g_realtime_chunk_remaining = strtoul(g_realtime_chunk_line.c_str(), nullptr, 16);
+            g_realtime_chunk_line = "";
+            if (g_realtime_chunk_remaining == 0)
+            {
+                g_realtime.stop();
+                break;
+            }
+            continue;
+        }
+
+        processRealtimeSseChar(ch);
+        g_realtime_chunk_remaining--;
+        if (g_realtime_chunk_remaining == 0)
+            g_realtime_chunk_trailer = 2;
+    }
+
+    const int activeSystem = gui_active_system_index();
+    if (!g_realtime_client_id.isEmpty() &&
+        activeSystem != g_realtime_system_index &&
+        millis() - g_realtime_subscription_attempt >= 250)
+        subscribeRealtime(g_realtime_client_id, activeSystem);
 }
 
 // Pick a status colour from the container's Docker status string.
@@ -405,7 +698,8 @@ void refreshContainerData()
 void updateBeszelData()
 {
     static unsigned long lastUpdate = 0;
-    if (millis() - lastUpdate < BESZEL_UPDATE_INTERVAL)
+    const unsigned long interval = g_realtime_subscribed ? 30000 : BESZEL_UPDATE_INTERVAL;
+    if (millis() - lastUpdate < interval)
         return;
     lastUpdate = millis();
 

@@ -13,13 +13,11 @@ struct ArcWithLabel
 
 ArcWithLabel create_arc(lv_obj_t *parent, const char *text, lv_color_t color);
 lv_obj_t *create_button_label(lv_obj_t *parent, const char *text, const ThemeColors *theme);
-lv_obj_t *create_compact_label(lv_obj_t *parent, const char *text, const ThemeColors *theme);
-void update_compact_label(lv_obj_t *btn, const char *text);
 void update_arc_label(lv_obj_t *label, const char *text);
 
 void create_system_monitor_gui();
 
-void set_arc_value_animated(lv_obj_t *arc, int32_t value, uint32_t duration = 500);
+void set_arc_value_animated(lv_obj_t *arc, int32_t value, uint32_t duration = 850);
 
 // Built lazily once the first systems list arrives: one dashboard page per
 // monitored system, followed by a single combined container page. Safe to call
@@ -36,6 +34,10 @@ void gui_update_dashboard(int idx, const BeszelSystem &sys);
 extern lv_obj_t *container_label;
 extern lv_obj_t *container_header;
 bool gui_container_page_active();
+
+// Index of the system dashboard currently on screen, or -1 when the combined
+// Containers page is visible.
+int gui_active_system_index();
 
 // Scroll the container list by dy pixels (driven directly from touch deltas;
 // positive dy follows a downward finger). Bounded to the list's scroll range.
