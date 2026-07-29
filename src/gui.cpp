@@ -30,6 +30,10 @@ struct ArcParts
     GlyphValue value;
     lv_obj_t *suffix;
     lv_obj_t *info;
+    float shown;
+    float target;
+    float velocity;
+    bool initialized;
 };
 
 struct CompactParts
@@ -72,6 +76,7 @@ struct DashWidgets
 };
 static DashWidgets dash[BESZEL_MAX_SYSTEMS];
 static int dash_count = 0;
+static lv_timer_t *gauge_timer = nullptr;
 
 // Combined container page (populated by beszel_api.cpp).
 lv_obj_t *container_label = NULL;
@@ -89,7 +94,9 @@ ArcWithLabel create_arc(lv_obj_t *parent, const char *text, lv_color_t color)
 
     lv_obj_set_size(arc, 110, 110);
     lv_arc_set_rotation(arc, 135);
-    lv_arc_set_range(arc, 0, 100);
+    // Tenths preserve Beszel's decimal samples. The LVGL arc eventually maps
+    // these to integer degrees, but a 0..1000 range avoids whole-percent jumps.
+    lv_arc_set_range(arc, 0, 1000);
     lv_arc_set_bg_angles(arc, 0, 270);
     lv_arc_set_value(arc, 0);
 
@@ -368,25 +375,79 @@ static void update_compact_metric(lv_obj_t *btn, const char *value,
         set_metric_text(parts->suffix, suffix);
 }
 
-void set_arc_value_animated(lv_obj_t *arc, int32_t value, uint32_t duration)
+static void update_smooth_arc(ArcWithLabel &gauge, float dt)
+{
+    if (!gauge.arc || !lv_obj_is_valid(gauge.arc))
+        return;
+    ArcParts *parts = (ArcParts *)lv_obj_get_user_data(gauge.arc);
+    if (!parts || !parts->initialized)
+        return;
+
+    const float error = parts->target - parts->shown;
+    if (fabsf(error) < 0.02f && fabsf(parts->velocity) < 0.05f)
+    {
+        parts->shown = parts->target;
+        parts->velocity = 0.0f;
+    }
+    else
+    {
+        // Critically damped motion. New samples update only the target, so
+        // velocity remains continuous rather than restarting every second.
+        const float omega = 7.0f;
+        const float acceleration = omega * omega * error - 2.0f * omega * parts->velocity;
+        parts->velocity += acceleration * dt;
+        parts->shown += parts->velocity * dt;
+    }
+
+    const int32_t rendered = (int32_t)(parts->shown * 10.0f + 0.5f);
+    if (lv_arc_get_value(gauge.arc) != rendered)
+        lv_arc_set_value(gauge.arc, rendered);
+}
+
+static void gauge_timer_cb(lv_timer_t *timer)
+{
+    LV_UNUSED(timer);
+    static uint32_t previous = 0;
+    const uint32_t now = lv_tick_get();
+    if (previous == 0)
+    {
+        previous = now;
+        return;
+    }
+    uint32_t elapsed = now - previous;
+    previous = now;
+    if (elapsed > 50)
+        elapsed = 50;
+    const float dt = elapsed / 1000.0f;
+    for (int i = 0; i < dash_count; i++)
+    {
+        update_smooth_arc(dash[i].cpu_arc, dt);
+        update_smooth_arc(dash[i].ram_arc, dt);
+    }
+}
+
+void set_arc_value_animated(lv_obj_t *arc, float value)
 {
     if (!arc)
         return;
 
-    value = (value < 0) ? 0 : (value > 100) ? 100
-                                            : value;
-    if (lv_arc_get_value(arc) == value)
+    value = value < 0.0f ? 0.0f : (value > 100.0f ? 100.0f : value);
+    ArcParts *parts = (ArcParts *)lv_obj_get_user_data(arc);
+    if (!parts)
         return;
+    if (!parts->initialized)
+    {
+        parts->shown = value;
+        parts->target = value;
+        parts->velocity = 0.0f;
+        parts->initialized = true;
+        lv_arc_set_value(arc, (int32_t)(value * 10.0f + 0.5f));
+    }
+    else
+        parts->target = value;
 
-    static lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, arc);
-    lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_arc_set_value);
-    lv_anim_set_values(&a, lv_arc_get_value(arc), value);
-    lv_anim_set_time(&a, duration);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-    lv_anim_set_ready_cb(&a, NULL);
-    lv_anim_start(&a);
+    if (!gauge_timer)
+        gauge_timer = lv_timer_create(gauge_timer_cb, 15, nullptr);
 }
 
 void update_arc_label(lv_obj_t *label, const char *text)
@@ -854,7 +915,7 @@ void gui_update_dashboard(int idx, const BeszelSystem &sys)
             snprintf(buf, sizeof(buf), "%d cores", sys.cores);
             set_metric_text(parts->info, buf);
         }
-        set_arc_value_animated(d.cpu_arc.arc, (int)sys.cpu);
+        set_arc_value_animated(d.cpu_arc.arc, sys.cpu);
     }
 
     // RAM arc: % value, with total GB (from system_stats) on the info line.
@@ -871,7 +932,7 @@ void gui_update_dashboard(int idx, const BeszelSystem &sys)
                 buf[0] = '\0';
             set_metric_text(parts->info, buf);
         }
-        set_arc_value_animated(d.ram_arc.arc, (int)sys.mem);
+        set_arc_value_animated(d.ram_arc.arc, sys.mem);
     }
 
     if (sys.hasTemp)

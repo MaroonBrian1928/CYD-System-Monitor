@@ -17,7 +17,7 @@ void update_arc_label(lv_obj_t *label, const char *text);
 
 void create_system_monitor_gui();
 
-void set_arc_value_animated(lv_obj_t *arc, int32_t value, uint32_t duration = 850);
+void set_arc_value_animated(lv_obj_t *arc, float value);
 
 // Built lazily once the first systems list arrives: one dashboard page per
 // monitored system, followed by a single combined container page. Safe to call
